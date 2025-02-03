@@ -34,8 +34,7 @@ create_directories() {
              "$base_output_dir/counts" \
              "$base_output_dir/hmmerout" \
              "$base_output_dir/trimmed_reads" \
-             "$base_output_dir/trim_tables" \
-             "$base_output_dir/lv_tables"
+             "$base_output_dir/trim_tables" 
 }
 
 unzip_fastq_files() {
@@ -72,7 +71,7 @@ best_frame() {
             seqkit fq2fa "$sample_fastq" -o "$sample_DNA_reads"
 
             log "Translating $sample_DNA_reads to AA sequences..."
-            Rscript "$HOME/Desktop/thesisRCode/translate_sample.R" "$sample_DNA_reads" "$sample_AA_reads" "$counter"
+            Rscript "$HOME/Desktop/RScripts/translate_sample.R" "$sample_DNA_reads" "$sample_AA_reads" "$counter"
 
             rm "$sample_fastq" "$sample_DNA_reads"
 
@@ -91,7 +90,7 @@ best_frame() {
     done
 
     log "Determining the best start position for translation..."
-    Rscript "$HOME/Desktop/thesisRCode/determine_frame.R" "$output_dir/hmmerout"
+    Rscript "$HOME/Desktop/RScripts/determine_frame.R" "$output_dir/hmmerout"
 }
 
 aa_pipeline() {
@@ -127,7 +126,7 @@ aa_pipeline() {
             seqkit fq2fa "$filtered_fastq" -o "$DNA_reads"
 
             log "Translating $DNA_reads to AA sequences..."
-            Rscript "$HOME/Desktop/thesisRCode/alligator_translate.R" "$DNA_reads" "$count_file_fwd" "$count_file_rev" "$output_base_dir/filtered_reads/AA" "$best_start_pos_file"
+            Rscript "$HOME/Desktop/RScripts/alligator_translate.R" "$DNA_reads" "$count_file_fwd" "$count_file_rev" "$output_base_dir/filtered_reads/AA" "$best_start_pos_file"
 
             pigz -6 "$file" "$DNA_reads"
             rm "$filtered_fastq"
@@ -146,10 +145,13 @@ aa_pipeline() {
         hmmsearch --domtblout "$hmmerfile" "$hmm_file" "$file"
 
         log "Trimming sequences for $file..."
-        Rscript "$HOME/Desktop/thesisRCode/alligator_trim.R" "$hmmerfile" "$count_file" "$trim_tables" "$trimmed_reads"
+        Rscript "$HOME/Desktop/RScripts/alligator_trim.R" "$hmmerfile" "$count_file" "$trim_tables" "$trimmed_reads"
 
         pigz -6 "$file" "$hmmerfile"
     done
+
+    # Remove intermediate output
+    rm -r "$output_base_dir/hmmerout" "$output_base_dir/filtered_reads" "$output_base_dir/counts"
 }
 
 dna_pipeline() {
@@ -184,10 +186,13 @@ dna_pipeline() {
         nhmmer --tblout "$hmmerfile" "$hmm_file" "$file"
 
         log "Trimming sequences for $file..."
-        Rscript "$HOME/Desktop/thesisRCode/alligator_trim.R" "$hmmerfile" "$file" "$trim_tables" "$trimmed_reads"
+        Rscript "$HOME/Desktop/RScripts/alligator_trim.R" "$hmmerfile" "$file" "$trim_tables" "$trimmed_reads"
 
         pigz -6 "$file" "$hmmerfile"
     done
+
+    # Remove intermediate output
+    rm -r "$output_base_dir/hmmerout" "$output_base_dir/filtered_reads" "$output_base_dir/counts"
 }
 
 # Main Logic
