@@ -1,8 +1,38 @@
+# Set CRAN mirror
+options(repos = c(CRAN = "https://cran.r-project.org"))
+
+# Check if package is installed (install it if not)
+install_if_needed <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+}
+
+# Install packages 
+install_if_needed("dplyr")
+install_if_needed("stringr")
+
+if (!requireNamespace("Biostrings", quietly = TRUE)) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+  }
+  BiocManager::install("Biostrings")
+}
+
+# Load packages
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(stringr)
+  library(Biostrings)
+})
+
+# Get command line arguments
 args <- commandArgs(trailingOnly = TRUE)
-heavy_hmmer_tbl <- args[1]  
-light_hmmer_tbl <- args[2] 
-sequence <- args[3]  
-output <- args[4]
+hmmer_tbl <- args[1]  
+count_file <- args[2]
+csv_output <- args[3] 
+fasta_output <- args[4]
+# need to add optional second hmmer file
 
 # read_domtblout function (adapted from rhmmer package)
 read_domtblout <- function(file){
@@ -67,10 +97,32 @@ read_domtblout <- function(file){
 }
 
 # Function to trim sequences 
-process_hmmer <- function(heavy_hmmer_tbl, light_hmmer_tbl, sequence) {
+process_hmmer <- function(hmmer_tbl,count_file, sequence) {
+  # Read hmmerouts 
+  hmmer_tbl <- read_domtblout(hmmer_tbl)
+  counts <- read.table(count_file, header = TRUE, sep = ",")
+  
+  # Trim sequences based on HMMER alignments
+  hmmer_tbl <- hmmer_tbl %>%
+    group_by(target_name) %>%
+    slice_max(domain_score, with_ties = FALSE) %>% # keep highest scoring domain 
+    ungroup() %>%
+    dplyr::select(target_name, domain_len, domain_score, e_value, ali_from, ali_to) %>%
+    inner_join(counts, by = "target_name") %>% # add sequence info
+    mutate(
+      trimmed_seq = substr(Sequence, ali_from, ali_to), # trim AA sequence 
+      trimmed_seq_len = nchar(trimmed_seq) 
+    ) 
+    
+  return(hmmer_tbl)
+}
+
+# Function to trim sequences (heavy + light)
+process_duo_hmmer <- function(heavy_hmmer_tbl, light_hmmer_tbl, sequence) {
   # Read hmmerouts 
   heavy_hmmer_tbl <- read_domtblout(heavy_hmmer_tbl)
   light_hmmer_tbl <- read_domtblout(light_hmmer_tbl)
+  sequence <- readAAStringSet(sequence)
   
   # Convert AAStringSet to df
   sequence_df <- data.frame(
@@ -86,9 +138,10 @@ process_hmmer <- function(heavy_hmmer_tbl, light_hmmer_tbl, sequence) {
     dplyr::select(target_name, domain_len, domain_score, ali_from, ali_to) %>%
     inner_join(sequence_df, by = "target_name") %>% # add sequence info
     mutate(
-      H_trimmed_seq = substr(Sequence, ali_from, ali_to), # trim AA sequence 
-      H_trimmed_seq_len = nchar(trimmed_seq) 
-    ) 
+      trimmed_seq = substr(Sequence, ali_from, ali_to), # trim AA sequence 
+      trimmed_seq_len = nchar(trimmed_seq) 
+    ) %>%
+    rename_with(~ paste0("H_", .), -target_name)
   
   light_hmmer_tbl <- light_hmmer_tbl %>%
     group_by(target_name) %>%
@@ -97,9 +150,10 @@ process_hmmer <- function(heavy_hmmer_tbl, light_hmmer_tbl, sequence) {
     dplyr::select(target_name, domain_len, domain_score, ali_from, ali_to) %>%
     inner_join(sequence_df, by = "target_name") %>% # add sequence info
     mutate(
-      L_trimmed_seq = substr(Sequence, ali_from, ali_to), # trim AA sequence 
-      L_trimmed_seq_len = nchar(trimmed_seq) 
-    ) 
+      trimmed_seq = substr(Sequence, ali_from, ali_to), # trim AA sequence 
+      trimmed_seq_len = nchar(trimmed_seq) 
+    ) %>%
+    rename_with(~ paste0("L_", .), -target_name)
   
   # Merge heavy and light data
   combined_tbl <- heavy_hmmer_tbl %>%
@@ -108,5 +162,11 @@ process_hmmer <- function(heavy_hmmer_tbl, light_hmmer_tbl, sequence) {
   return(combined_tbl)
 }
 
-table <- process_hmmer(heavy_hmmer_tbl, light_hmmer_tbl, sequence)
-write.csv(table, file = output)
+# Write table of results to csv 
+table <- process_hmmer(hmmer_tbl, count_file, sequence)
+write.csv(table, file = csv_output)
+
+# Write trimmed sequences to fasta file 
+trimmed_seqs <- AAStringSet(table$trimmed_seq)
+names(trimmed_seqs) <- table$target_name
+writeXStringSet(trimmed_seqs, filepath = fasta_output)
