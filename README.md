@@ -1,7 +1,7 @@
 # DNA and AA Analysis Pipeline
 
 ## Overview
-This pipeline processes DNA and amino acid (AA) sequences from FASTQ files. It performs quality filtering, translation, HMMER searches, and clustering analysis. The pipeline supports separate workflows for DNA and AA data.
+This pipeline processes DNA and amino acid (AA) sequences from FASTQ files. It performs quality filtering, translation, HMMER searches, and sequence trimming. The pipeline supports separate workflows for DNA and AA data.
 
 ## Install System Dependencies
 This pipeline requires several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
