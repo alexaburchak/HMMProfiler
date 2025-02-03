@@ -1,10 +1,32 @@
+# Set CRAN mirror
+options(repos = c(CRAN = "https://cran.r-project.org"))
+
+# Check if package is installed (install it if not)
+install_if_needed <- function(pkg) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
+    install.packages(pkg)
+  }
+}
+
+# Install packages 
+install_if_needed("dplyr")
+install_if_needed("stringr")
+
+if (!requireNamespace("Biostrings", quietly = TRUE)) {
+  if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+  }
+  BiocManager::install("Biostrings")
+}
+
+# Load packages
 suppressPackageStartupMessages({
-  library(Biostrings)
   library(dplyr)
   library(stringr)
+  library(Biostrings)
 })
 
-# Parse arguments
+# Get command line arguments
 args <- commandArgs(trailingOnly = TRUE)
 fasta_file <- args[1]         
 fasta_output_dir <- args[2]   
