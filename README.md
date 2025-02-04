@@ -24,7 +24,9 @@ conda create -n pipeline_env
 conda acitvate pipeline_env
 
 # Install dependencies 
-conda install -c bioconda jq pigz seqkit hmmer r-base
+conda install -c bioconda jq pigz seqkit  
+conda install -c conda-forge r-base
+conda install -c bioconda hmmer
 ```
 
 ### Option 3: Using Homebrew (MacOS/Linux)
