@@ -72,7 +72,7 @@ best_frame() {
             seqkit fq2fa "$sample_fastq" -o "$sample_DNA_reads"
 
             log "Translating $sample_DNA_reads to AA sequences..."
-            Rscript "$script_dir/translate_sample.R" "$sample_DNA_reads" "$sample_AA_reads" "$counter"
+            Rscript "$script_dir/Rscripts/translate_sample.R" "$sample_DNA_reads" "$sample_AA_reads" "$counter"
 
             rm "$sample_fastq" "$sample_DNA_reads"
 
@@ -91,7 +91,7 @@ best_frame() {
     done
 
     log "Determining the best start position for translation..."
-    Rscript "$script_dir/determine_frame.R" "$output_dir/hmmerout"
+    Rscript "$script_dir/Rscripts/determine_frame.R" "$output_dir/hmmerout"
 }
 
 aa_pipeline() {
@@ -128,7 +128,7 @@ aa_pipeline() {
             seqkit fq2fa "$filtered_fastq" -o "$DNA_reads"
 
             log "Translating $DNA_reads to AA sequences..."
-            Rscript "$script_dir/alligator_translate.R" "$DNA_reads" "$count_file_fwd" "$count_file_rev" "$output_base_dir/filtered_reads/AA" "$best_start_pos_file"
+            Rscript "$script_dir/Rscripts/alligator_translate.R" "$DNA_reads" "$count_file_fwd" "$count_file_rev" "$output_base_dir/filtered_reads/AA" "$best_start_pos_file"
 
             pigz -6 "$file" "$DNA_reads"
             rm "$filtered_fastq"
@@ -148,7 +148,7 @@ aa_pipeline() {
         hmmsearch --domtblout "$hmmerfile" "$hmm_file" "$file"
 
         log "Trimming sequences for $file..."
-        Rscript "$script_dir/alligator_trim.R" "$hmmerfile" "$count_file" "$trim_tables" "$trimmed_reads"
+        Rscript "$script_dir/Rscripts/alligator_trim.R" "$hmmerfile" "$count_file" "$trim_tables" "$trimmed_reads"
 
         pigz -6 "$file" "$hmmerfile"
     done
