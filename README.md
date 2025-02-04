@@ -1,7 +1,7 @@
 # DNA and AA Analysis Pipeline
 
 ## Overview
-This pipeline processes DNA and amino acid (AA) sequences from FASTQ files. It performs quality filtering, translation, HMMER searches, and clustering analysis. The pipeline supports separate workflows for DNA and AA data.
+This pipeline processes DNA and amino acid (AA) sequences from FASTQ files. It performs quality filtering, translation, HMMER searches, and sequence trimming. The pipeline supports separate workflows for DNA and AA data.
 
 ## Install System Dependencies
 This pipeline requires several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
@@ -24,7 +24,9 @@ conda create -n pipeline_env
 conda acitvate pipeline_env
 
 # Install dependencies 
-conda install -c bioconda jq pigz seqkit hmmer r-base
+conda install -c bioconda jq pigz seqkit  
+conda install -c conda-forge r-base
+conda install -c bioconda hmmer
 ```
 
 ### Option 3: Using Homebrew (MacOS/Linux)
@@ -48,7 +50,7 @@ Make sure that the following directory paths are correctly set up in your config
 
 2. **Run the Script**:
    ```bash
-   ./pipeline.sh
+   ./pipe_with_config.sh
 
 3. **Outputs**
 - The results are saved in:
