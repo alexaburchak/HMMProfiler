@@ -48,7 +48,7 @@ Make sure that the following directory paths are correctly set up in your config
 
 2. **Run the Script**:
    ```bash
-   ./pipeline.sh
+   ./pipe_with_config.sh
 
 3. **Outputs**
 - The results are saved in:
