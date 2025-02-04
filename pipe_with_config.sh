@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Load Configuration File
+# Load Configuration File- make independent  
 CONFIG_FILE="configs.json"
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "Error: Configuration file $CONFIG_FILE not found."
@@ -50,6 +50,7 @@ unzip_fastq_files() {
 best_frame() {
     local fastq_dir=$1
     local hmm=$2
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local output_dir
     output_dir="$HOME/Desktop/pipeline_output/det_frame"
 
@@ -71,7 +72,7 @@ best_frame() {
             seqkit fq2fa "$sample_fastq" -o "$sample_DNA_reads"
 
             log "Translating $sample_DNA_reads to AA sequences..."
-            Rscript "$HOME/Desktop/RScripts/translate_sample.R" "$sample_DNA_reads" "$sample_AA_reads" "$counter"
+            Rscript "$script_dir/translate_sample.R" "$sample_DNA_reads" "$sample_AA_reads" "$counter"
 
             rm "$sample_fastq" "$sample_DNA_reads"
 
@@ -90,7 +91,7 @@ best_frame() {
     done
 
     log "Determining the best start position for translation..."
-    Rscript "$HOME/Desktop/RScripts/determine_frame.R" "$output_dir/hmmerout"
+    Rscript "$script_dir/determine_frame.R" "$output_dir/hmmerout"
 }
 
 aa_pipeline() {
@@ -114,6 +115,7 @@ aa_pipeline() {
     for file in "$fastq_dir"/*.fastq; do
         if [ -f "$file" ]; then
             local base_name=$(basename "${file}" .fastq)
+            local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
             local filtered_fastq="filtered_${base_name}.fastq"
             local DNA_reads="$output_base_dir/filtered_reads/DNA/${base_name}.fasta"
             local count_file_fwd="$output_base_dir/counts/${base_name}_fwd_counts.csv"
@@ -126,7 +128,7 @@ aa_pipeline() {
             seqkit fq2fa "$filtered_fastq" -o "$DNA_reads"
 
             log "Translating $DNA_reads to AA sequences..."
-            Rscript "$HOME/Desktop/RScripts/alligator_translate.R" "$DNA_reads" "$count_file_fwd" "$count_file_rev" "$output_base_dir/filtered_reads/AA" "$best_start_pos_file"
+            Rscript "$script_dir/alligator_translate.R" "$DNA_reads" "$count_file_fwd" "$count_file_rev" "$output_base_dir/filtered_reads/AA" "$best_start_pos_file"
 
             pigz -6 "$file" "$DNA_reads"
             rm "$filtered_fastq"
@@ -135,6 +137,7 @@ aa_pipeline() {
 
     log "Running HMMER searches..."
     for file in "$output_base_dir/filtered_reads/AA"/*.fasta; do
+        local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         local base_name=$(basename "$file" _AA.fasta)
         local hmmerfile="$output_base_dir/hmmerout/${base_name}_AA_hmmerout.tbl"
         local count_file="$output_base_dir/counts/${base_name}_counts.csv"
@@ -145,7 +148,7 @@ aa_pipeline() {
         hmmsearch --domtblout "$hmmerfile" "$hmm_file" "$file"
 
         log "Trimming sequences for $file..."
-        Rscript "$HOME/Desktop/RScripts/alligator_trim.R" "$hmmerfile" "$count_file" "$trim_tables" "$trimmed_reads"
+        Rscript "$script_dir/alligator_trim.R" "$hmmerfile" "$count_file" "$trim_tables" "$trimmed_reads"
 
         pigz -6 "$file" "$hmmerfile"
     done
