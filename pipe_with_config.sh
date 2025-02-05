@@ -77,10 +77,10 @@ best_frame() {
     # Create output directory
     mkdir -p "$output_dir/filtered_reads" "$output_dir/hmmerout"
 
+    # Translate in all reading frames
     local counter=1
     local sample_AA_reads="$output_dir/filtered_reads"
 
-    # Translate in all reading frames
     for file in "$fastq_dir"/*.fastq; do
         if [ -f "$file" ]; then
             local base_name=$(basename "${file}" .fastq)
@@ -111,8 +111,12 @@ best_frame() {
         pigz -6 "$file"
     done
 
+    # Determine best translation frame based on e-values 
     log "Determining the best start position for translation..."
     Rscript "$script_dir/Rscripts/determine_frame.R" "$output_dir/hmmerout"
+
+    # Remove intermediate output
+    rm -r "$output_dir"
 }
 
 # Main AA pipeline 
@@ -129,11 +133,11 @@ aa_pipeline() {
             exit 1
         fi
     else
+        # If the user provides a start position, use this instead 
         best_start_pos=$best_start_position
     fi
-    
-    rm -r $output_base_dir/det_frame
 
+    # Translate all sequences 
     for file in "$fastq_dir"/*.fastq; do
         if [ -f "$file" ]; then
             local base_name=$(basename "${file}" .fastq)
@@ -157,6 +161,9 @@ aa_pipeline() {
         fi
     done
 
+    rm "$best_start_pos_file" 
+
+    # Run HMMER and trim sequences 
     log "Running HMMER searches..."
     for file in "$output_base_dir/filtered_reads/AA"/*.fasta; do
         local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
