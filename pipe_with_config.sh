@@ -1,17 +1,32 @@
 #!/bin/bash
 
-# Load Configuration File- make independent  
-CONFIG_FILE="configs.json"
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: Configuration file $CONFIG_FILE not found."
-    exit 1
-fi
+# Function to load configuration from provided JSON file
+load_config() {
+    local config_file=$1
 
-# Parse JSON Configuration File
+    if [ ! -f "$config_file" ]; then
+        echo "Error: Configuration file $config_file not found."
+        exit 1
+    fi
+
+    echo "Loading configuration from $config_file..."
+    CONFIG_FILE="$config_file"
+}
+
+# Function to parse configuration values
 get_config_value() {
     local key=$1
     jq -r ".$key" "$CONFIG_FILE"
 }
+
+# Check if a configuration file was provided as an argument
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <config_file>"
+    exit 1
+fi
+
+# Load the provided configuration file
+load_config "$1"
 
 # Load Config Values
 fastq_dir=$(get_config_value "fastq_dir")
@@ -21,6 +36,10 @@ hmm_file=$(get_config_value "hmm_file")
 min_quality=$(get_config_value "min_quality")
 best_start_position=$(get_config_value "best_start_position")
 gzip_compression_level=$(get_config_value "gzip_compression_level")
+
+# Defaults for optional parameters
+best_start_position=${best_start_position:-"auto"}  # Default to "auto" if not provided
+gzip_compression_level=${gzip_compression_level:-6}  # Default to compression level 6 if not provided
 
 # Helper Functions
 log() {
@@ -47,6 +66,7 @@ unzip_fastq_files() {
     done
 }
 
+# Function to determine best frame for translation 
 best_frame() {
     local fastq_dir=$1
     local hmm=$2
@@ -80,6 +100,7 @@ best_frame() {
         fi
     done
 
+    # Run HMMER on sample files
     for file in "$sample_AA_reads"/*.fasta; do
         local base_name=$(basename "$file" .fasta)
         local hmmerfile="$output_dir/hmmerout/${base_name}.tbl"
@@ -94,6 +115,7 @@ best_frame() {
     Rscript "$script_dir/Rscripts/determine_frame.R" "$output_dir/hmmerout"
 }
 
+# Main AA pipeline 
 aa_pipeline() {
     unzip_fastq_files "$fastq_dir"
     create_directories "$output_base_dir"
