@@ -1,0 +1,28 @@
+{
+  "name": "ngs_pipeline",
+  "version": "1.0.0",
+  "description": "## Overview This pipeline processes DNA and amino acid (AA) sequences from FASTQ files. It performs quality filtering, translation, HMMER searches, and sequence trimming. The pipeline supports separate workflows for DNA and AA data.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+		"format-check": "biome format .",
+		"format-write": "biome format --write .",
+		"lint-check": "biome check .",
+		"lint-write": "biome check --write .",
+		"check": "npm run format-check && npm run lint-check",
+		"fix": "npm run format-write && npm run lint-write"
+	},
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@biomejs/biome": "1.9.2",
+    "@types/node": "20.4.5",
+    "esbuild": "0.23.1",
+    "rimraf": "6.0.1",
+    "typescript": "5.1.6",
+    "@types/yargs": "17.0.24"
+  },
+  "dependencies": {
+    "yargs": "17.7.2"
+  }
+}
