@@ -1,0 +1,8 @@
+{
+    "input_pairs": [
+        {"fastq_path": "/Users/alexaburchak/Desktop/super_cool_input/demultiplex.bc1016_BAK8B_OA--bc1016_BAK8B_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/super_cool_input/demultiplex.bc1016_BAK8B_OA--bc1016_BAK8B_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/kappa_AA.hmm"}
+    ],
+    "output_path": "/Users/alexaburchak/Desktop/super_cool_output",
+    "min_quality": 20
+}
