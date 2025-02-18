@@ -6,18 +6,7 @@ This pipeline processes DNA and amino acid (AA) sequences from FASTQ files. It p
 ## Install System Dependencies
 This pipeline requires several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
 
-### Option 1: Using APT (Debian/Ubuntu)
-```bash
-sudo apt update && sudo apt install -y \
-    jq \
-    pigz \
-    seqkit \
-    hmmer \
-    nhmmer \
-    r-base
-```
-
-### Option 2: Using Conda (Preferred)
+### Option 1: Using Conda (Preferred)
 ```bash
 # Create conda environment
 conda create -n pipeline_env
@@ -29,7 +18,7 @@ conda install -c conda-forge r-base
 conda install -c bioconda hmmer
 ```
 
-### Option 3: Using Homebrew (MacOS/Linux)
+### Option 2: Using Homebrew (MacOS/Linux)
 ```bash
 brew install jq pigz seqkit hmmer
 brew install --cask r
