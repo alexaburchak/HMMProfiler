@@ -1,0 +1,9 @@
+{
+    "fastq_dir": "/Users/alexaburchak/Desktop/super_cool_input", 
+    "output_base_dir": "/Users/alexaburchak/Desktop/pipeline_output", 
+    "pipeline_mode": "aa", 
+    "gzip_compression_level": 6, 
+    "hmm_file": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm", 
+    "min_quality": 20,
+    "best_start_position": "auto"
+}
