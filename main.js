@@ -72,9 +72,8 @@ async function runHMMSearch(modelPath, fastaPath, outputPath) {
 		hmmsearch.on("close", (code) => {
 			// Check exit code to determine if hmmsearch was successful
 			if (code === 0) {
-				resolve(
-					`hmmsearch completed successfully. Output written to ${outputPath}`,
-				);
+				console.log(`hmmsearch completed successfully. Output written to ${outputPath}`);
+				resolve("Success");
 			} else {
 				// If exit code is non-zero, an error occurred
 				reject(new Error(`hmmsearch process exited with code ${code}`));
@@ -117,7 +116,7 @@ async function parseFullHMMOutput(hmmerOut) {
 		const bestEntries = {};
 
 		for (const entry of parsedData) {
-			const key = entry.target_name; // Only consider the target name, ignoring reading frames
+			const key = entry.target_name; 
 
 			// Keep the highest-scoring entry per target_name
 			// @ts-ignore
