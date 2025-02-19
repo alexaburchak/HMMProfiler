@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import csv from "csv-parser";
 import { get_config_by_path, get_config_path_by_args } from "./src/config.js";
 
 // Define function to process ALL sequences from fastq
@@ -72,7 +73,9 @@ async function runHMMSearch(modelPath, fastaPath, outputPath) {
 		hmmsearch.on("close", (code) => {
 			// Check exit code to determine if hmmsearch was successful
 			if (code === 0) {
-				console.log(`hmmsearch completed successfully. Output written to ${outputPath}`);
+				console.log(
+					`hmmsearch completed successfully. Output written to ${outputPath}`,
+				);
 				resolve("Success");
 			} else {
 				// If exit code is non-zero, an error occurred
@@ -116,7 +119,7 @@ async function parseFullHMMOutput(hmmerOut) {
 		const bestEntries = {};
 
 		for (const entry of parsedData) {
-			const key = entry.target_name; 
+			const key = entry.target_name;
 
 			// Keep the highest-scoring entry per target_name
 			// @ts-ignore
@@ -216,7 +219,84 @@ async function mergeData(
 }
 
 // Define function to count unique VH-VL pairs
-// UNDER CONSTRUCTION
+async function countSeqs(mergedDataPath) {
+	return new Promise((resolve, reject) => {
+		const data = [];
+
+		// Read CSV file and collect data
+		fs.createReadStream(mergedDataPath)
+			.pipe(csv())
+			.on("data", (row) => {
+				data.push(row);
+			})
+			.on("end", () => {
+				console.log("CSV file successfully processed.");
+
+				// Process data to find VH/VL pairs
+				const pairs = data.reduce((acc, entry) => {
+					const isVH = entry.model_name.toLowerCase().includes("vh");
+					const isVL = entry.model_name.toLowerCase().includes("vl");
+
+					// Only process entries with a VH or VL seq
+					if (isVH || isVL) {
+						const { target_name, FASTQ_filename, trimmed_seq } = entry;
+
+						// Create unique key based on target name and FASTQ file
+						const pairKey = `${target_name}_${FASTQ_filename}`;
+
+						// Create object to store VH and VL seqs
+						if (!acc[pairKey]) {
+							acc[pairKey] = {
+								target_name,
+								FASTQ_filename,
+								vh_sequence: null,
+								vl_sequence: null,
+							};
+						}
+
+						// Assign trimmed_seq to correct VH or VL field
+						if (isVH && acc[pairKey].vh_sequence === null) {
+							acc[pairKey].vh_sequence = trimmed_seq;
+						} else if (isVL && acc[pairKey].vl_sequence === null) {
+							acc[pairKey].vl_sequence = trimmed_seq;
+						}
+					}
+					return acc;
+				}, {});
+
+				// Filter for complete VH/VL pairs
+				const completePairs = Object.values(pairs).filter(
+					(pair) => pair.vh_sequence && pair.vl_sequence,
+				);
+
+				if (completePairs.length === 0) {
+					return reject(
+						new Error("No complete VH and VL sequence pairs found."),
+					);
+				}
+
+				// Count occurrences of each VH/VL pair
+				const pairCounts = completePairs.reduce((acc, pair) => {
+					const { vh_sequence, vl_sequence } = pair;
+					const pairIdentifier = `${vh_sequence}_${vl_sequence}`;
+
+					if (!acc[pairIdentifier]) {
+						acc[pairIdentifier] = { vh_sequence, vl_sequence, count: 0 };
+					}
+					acc[pairIdentifier].count++;
+
+					return acc;
+				}, {});
+
+				// Convert to array format and sort in desc order
+				const result = Object.values(pairCounts).sort(
+					(a, b) => b.count - a.count,
+				);
+				resolve(result);
+			})
+			.on("error", (error) => reject(error));
+	});
+}
 
 // Define function to write/append merged output to CSV
 // @ts-ignore
@@ -274,10 +354,8 @@ async function main() {
 
 	// Define paths for final output files
 	const date = new Date().toISOString().split("T")[0]; // Record date of job (YYYY-MM-DD)
-	const matchesOut = path.join(
-		output_path,
-		`ngs_hmm_matches_${date}.csv`, // need to add job ID to filename
-	);
+	const matchesOut = path.join(output_path, `ngs_hmm_matches_${date}.csv`); // need to add job ID to filename
+	const countsOut = path.join(output_path, `ngs_trimmed_counts_${date}.csv`);
 
 	// Loop over input pairs
 	for (const { fastq_path, model_path } of input_pairs) {
@@ -308,6 +386,7 @@ async function main() {
 				model_path,
 			);
 			await writeCsv(matchesOut, mergedData, true);
+			console.log("Matches written to:", matchesOut);
 
 			// Clean intermediate files
 			fs.unlinkSync(fullFastaPath);
@@ -316,6 +395,15 @@ async function main() {
 			// @ts-ignore
 			console.error(error.message);
 		}
+	}
+
+	// Count unique VH/VL pairs after all input pairs are processed
+	try {
+		const countData = await countSeqs(matchesOut);
+		await writeCsv(countsOut, countData, true);
+		console.log("Final counts written to:", countsOut);
+	} catch (error) {
+		console.error("Error in countSeqs:", error.message);
 	}
 }
 
