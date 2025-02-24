@@ -4,6 +4,8 @@ import path from "node:path";
 import csv from "csv-parser";
 import { get_config_by_path, get_config_path_by_args } from "./src/config.js";
 
+// NOTE: Clustering is currently commented out, hmmer runs on full fasta files
+
 // Define function to process ALL sequences from fastq
 // @ts-ignore
 async function fullSeqKit(fastq_path, min_quality, output_dir, fullFastaPath) {
@@ -45,6 +47,46 @@ async function fullSeqKit(fastq_path, min_quality, output_dir, fullFastaPath) {
 		});
 	});
 }
+
+// Define function to cluster sequences for hmmer
+// @ts-ignore
+// async function getClusters(fastaPath, outputDir, tmpDir) {
+// 	return new Promise((resolve, reject) => {
+// 		const easyLinclust = spawn("mmseqs", [
+// 			"easy-linclust",
+// 			fastaPath,
+// 			path.join(outputDir, "test"),
+// 			tmpDir,
+// 			"--min-seq-id",
+// 			"0.9",
+// 		]);
+
+// 		easyLinclust.stdout.on("data", (data) => {
+// 			console.log(`stdout: ${data}`);
+// 		});
+
+// 		easyLinclust.stderr.on("data", (data) => {
+// 			console.error(`stderr: ${data}`);
+// 		});
+
+// 		easyLinclust.on("close", (code) => {
+// 			if (code === 0) {
+// 				// Define expected output files
+// 				const repSequences = path.join(outputDir, "test_rep_seq.fasta");
+// 				const clusterAssignments = path.join(outputDir, "test_cluster.tsv");
+// 				const allSequences = path.join(outputDir, "test_all_seqs.fasta");
+
+// 				resolve({
+// 					repSequences,
+// 					clusterAssignments,
+// 					allSequences,
+// 				});
+// 			} else {
+// 				reject(new Error(`Process exited with code ${code}`));
+// 			}
+// 		});
+// 	});
+// }
 
 // Define function to run hmmsearch
 // @ts-ignore
@@ -219,76 +261,55 @@ async function mergeData(
 }
 
 // Define function to count unique VH-VL pairs
+// @ts-ignore
+// Updated: process rows one at a time without reducing everything at once
 async function countSeqs(mergedDataPath) {
 	return new Promise((resolve, reject) => {
-		const data = [];
+		const pairs = {}; // Object to store pairs
 
-		// Read CSV file and collect data
 		fs.createReadStream(mergedDataPath)
 			.pipe(csv())
 			.on("data", (row) => {
-				data.push(row);
+				const isVH = row.model_name.toLowerCase().includes("vh");
+				const isVL = row.model_name.toLowerCase().includes("vl");
+
+				if (isVH || isVL) {
+					const { target_name, FASTQ_filename, trimmed_seq } = row;
+					const pairKey = `${target_name}_${FASTQ_filename}`;
+
+					if (!pairs[pairKey]) {
+						pairs[pairKey] = {
+							target_name,
+							FASTQ_filename,
+							vh_sequence: null,
+							vl_sequence: null,
+						};
+					}
+
+					if (isVH && pairs[pairKey].vh_sequence === null) {
+						pairs[pairKey].vh_sequence = trimmed_seq;
+					} else if (isVL && pairs[pairKey].vl_sequence === null) {
+						pairs[pairKey].vl_sequence = trimmed_seq;
+					}
+				}
 			})
 			.on("end", () => {
-				console.log("CSV file successfully processed.");
-
-				// Process data to find VH/VL pairs
-				const pairs = data.reduce((acc, entry) => {
-					const isVH = entry.model_name.toLowerCase().includes("vh");
-					const isVL = entry.model_name.toLowerCase().includes("vl");
-
-					// Only process entries with a VH or VL seq
-					if (isVH || isVL) {
-						const { target_name, FASTQ_filename, trimmed_seq } = entry;
-
-						// Create unique key based on target name and FASTQ file
-						const pairKey = `${target_name}_${FASTQ_filename}`;
-
-						// Create object to store VH and VL seqs
-						if (!acc[pairKey]) {
-							acc[pairKey] = {
-								target_name,
-								FASTQ_filename,
-								vh_sequence: null,
-								vl_sequence: null,
-							};
-						}
-
-						// Assign trimmed_seq to correct VH or VL field
-						if (isVH && acc[pairKey].vh_sequence === null) {
-							acc[pairKey].vh_sequence = trimmed_seq;
-						} else if (isVL && acc[pairKey].vl_sequence === null) {
-							acc[pairKey].vl_sequence = trimmed_seq;
-						}
-					}
-					return acc;
-				}, {});
-
-				// Filter for complete VH/VL pairs
+				// Process pairs and count them
 				const completePairs = Object.values(pairs).filter(
 					(pair) => pair.vh_sequence && pair.vl_sequence,
 				);
 
-				if (completePairs.length === 0) {
-					return reject(
-						new Error("No complete VH and VL sequence pairs found."),
-					);
-				}
-
-				// Count occurrences of each VH/VL pair
-				const pairCounts = completePairs.reduce((acc, pair) => {
+				const pairCounts = {};
+				completePairs.forEach((pair) => {
 					const { vh_sequence, vl_sequence } = pair;
 					const pairIdentifier = `${vh_sequence}_${vl_sequence}`;
 
-					if (!acc[pairIdentifier]) {
-						acc[pairIdentifier] = { vh_sequence, vl_sequence, count: 0 };
+					if (!pairCounts[pairIdentifier]) {
+						pairCounts[pairIdentifier] = { vh_sequence, vl_sequence, count: 0 };
 					}
-					acc[pairIdentifier].count++;
+					pairCounts[pairIdentifier].count++;
+				});
 
-					return acc;
-				}, {});
-
-				// Convert to array format and sort in desc order
 				const result = Object.values(pairCounts).sort(
 					(a, b) => b.count - a.count,
 				);
@@ -368,14 +389,20 @@ async function main() {
 		console.log(`Processing: ${fastq_path} with model ${model_path}`);
 
 		// Define intermediate output paths (these will be removed when processing is complete!)
-		const fullFastaPath = path.join(output_path, "full.fasta");
+		const fullFastaPath = path.join(output_path, `full.fasta`);
 		const domtbloutPath = path.join(output_path, `hmmsearch_out.tbl`);
+		// const tempDir = path.join(output_path, "temp");
 
 		try {
 			// Translate sequences in all 6 frames
 			await fullSeqKit(fastq_path, min_quality, output_path, fullFastaPath);
 
-			// Run HMMER
+			// Cluster sequences
+			// const clustOut = await getClusters(fullFastaPath, output_path, tempDir);
+			// const repSequences = clustOut.repSequences;
+			//const clusterAssignments = clustOut.clusterAssignments
+
+			// Run HMMER on representative sequences from each cluster
 			await runHMMSearch(model_path, fullFastaPath, domtbloutPath);
 
 			// Merge hmmsearch results with sequence information and trim based on match results
@@ -391,6 +418,7 @@ async function main() {
 			// Clean intermediate files
 			fs.unlinkSync(fullFastaPath);
 			fs.unlinkSync(domtbloutPath);
+			//fs.rmdirSync(tempDir);
 		} catch (error) {
 			// @ts-ignore
 			console.error(error.message);
