@@ -403,6 +403,28 @@ async function writeCsv(outputFile, data, append = false) {
 	}
 }
 
+/**
+ * Function to zip output files 
+ * @param {string} inputFile 
+ */
+function compressFile(inputFile) {
+	const gzip = spawn("gzip", [inputFile]); 
+  
+	// Listen for errors
+	gzip.stderr.on("data", (data) => {
+	  console.error(`stderr: ${data}`);
+	});
+  
+	// Listen for when the process finishes
+	gzip.on("close", (code) => {
+	  if (code === 0) {
+		console.log(`File successfully compressed: ${inputFile}.gz`);
+	  } else {
+		console.error(`gzip process for ${inputFile} exited with code ${code}`);
+	  }
+	});
+}
+
 // Define main function
 async function main() {
 	// Read config
@@ -472,10 +494,15 @@ async function main() {
 		}
 
 	} finally {
-		// Cleanup: Remove temporary directory and all its contents
+		// Remove temporary directory and all its contents
 		fs.rmSync(tempDir, { recursive: true, force: true });
 		console.log("Temporary files cleaned up.");
 	}
+
+	// Zip output files 
+	compressFile(matches_outpath);
+	compressFile(counts_outpath);
+	console.log("Pipeline complete!")
 }
 
 // Execute main function
