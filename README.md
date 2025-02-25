@@ -30,8 +30,9 @@ Make sure that the following directory paths are correctly set up in your config
 - input_pairs: 
   - fastq_path: Path to FASTQ file.
   - model_path: Path to the HMM profile file.
-- output_path: Directory where output files will be stored.
-- min_quality: Minimum quality score for filtering.
+- matches_outpath: Path to write all matches found by hmmsearch and their sequence information.
+- counts_outpath: Path to write all unique VH/VL pairs found in matches output and their frequency.
+- min_quality: Minimum quality score for FASTQ filtering.
 
 2. **Run the Script**:
 Assuming your config file is named pipe_configs.json, from the command line you can run: 
@@ -40,8 +41,8 @@ node main.js -c pipe_configs.json
 ```
 
 3. **Outputs**
-- The pipeline outputs two csv files that are saved to the assigned output folder:
-  1. `ngs_hmm_matches`: All matches found by hmmsearch and their sequence information. 
+- The pipeline outputs two csv files that are saved to the assigned output paths:
+  1. `matches_outpath`: All matches found by hmmsearch and their sequence information. 
     - target_name: Name of read (from FASTQ file).
     - score: Bit score calculated by hmmsearch.
     - e_value: E-value calculated by hmmsearch.
@@ -54,10 +55,11 @@ node main.js -c pipe_configs.json
     - seq_len: Length of trimmed sequence. 
     - start_pos: Start position for translation (can be 1, 2, 3, -1, -2, or -3). 
 
-  2. `ngs_trimmed_counts`: All unique VH/VL pairs found in ngs_hmm_matches and their frequency.  
+
+  2. `counts_outpath`: All unique VH/VL pairs found in ngs_hmm_matches and their frequency.  
     - vh_sequence: Trimmed heavy sequence.
     - vl_sequence: Trimmed light sequence. 
-    - count: Frequency of occurences of each VH/VL pair in ngs_hmm_matches. 
+    - count: Count of occurences of each VH/VL pair in matches_outpath. 
 
 ## Workflow
 
@@ -80,12 +82,12 @@ node main.js -c pipe_configs.json
 
 ### Step 5: Merge HMMER Output with FASTA sequences (mergeData) and Write to CSV (writeCSV)
 - Trims sequences based on ali_from and ali_to coordinates from hmmsearch. 
-- Generates final output file `ngs_hmm_matches`.
+- Generates final output file `matches_outpath`.
 
 ### Step 6: Count Unique VH/VL Pairs (countSeqs) and Write to CSV (writeCSV)
-- Reads `ngs_hmm_matches` line-by-line to identify VH/VL pairs by target_name, FASTQ_filename and model_name.
+- Reads `matches_outpath` line-by-line to identify VH/VL pairs by target_name, FASTQ_filename and model_name.
 - Stores pairs in an object and counts frequency of each pair. 
-- Generates final output file `ngs_hmm_counts`
+- Generates final output file `counts_outpath`
 
 ## NOTES
 - The name of your model should contain either 'VH' or 'VL' for successful sequence pairing in countSeqs(). 

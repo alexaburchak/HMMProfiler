@@ -10,7 +10,8 @@ import yargs from "yargs/yargs";
 
 /**
  * @typedef {object} PipelineConfig
- * @property {string} output_path - Directory for output file storage
+ * @property {string} matches_outpath - Path for hmmer matches output file
+ * @property {string} counts_outpath - Path for VH/VL pair counts output file 
  * @property {number} min_quality - Minimum quality threshold for filtering reads
  * @property {InputPair[]} input_pairs - List of FASTQ and model file pairs to process
  */
@@ -55,8 +56,12 @@ function is_config(maybe_config) {
 	if (typeof min_quality !== "number") {
 		return false;
 	}
-	const output_path = maybe_config.output_path;
-	if (typeof output_path !== "string") {
+	const matches_outpath = maybe_config.matches_outpath;
+	if (typeof matches_outpath !== "string") {
+		return false;
+	}
+	const counts_outpath = maybe_config.counts_outpath;
+	if (typeof counts_outpath !== "string") {
 		return false;
 	}
 	const input_pairs = maybe_config.input_pairs;
