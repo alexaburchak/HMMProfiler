@@ -11,7 +11,7 @@ import yargs from "yargs/yargs";
 /**
  * @typedef {object} PipelineConfig
  * @property {string} matches_outpath - Path for hmmer matches output file
- * @property {string} counts_outpath - Path for VH/VL pair counts output file 
+ * @property {string} counts_outpath - Path for VH/VL pair counts output file
  * @property {number} min_quality - Minimum quality threshold for filtering reads
  * @property {InputPair[]} input_pairs - List of FASTQ and model file pairs to process
  */

@@ -1,7 +1,7 @@
-# Pipeline for Identifying and Quantifying VH-VL Pairs from Next-Generation Sequencing Data
+# Pipeline for Identifying Functional Regions in Antibodies from NGS Data
 
 ## Overview
-This pipeline processes next-generation sequencing (FASTQ) data to identify and quantify VH-VL antibody sequence pairs. It first translates nucleotide sequences in all six reading frames using SeqKit, then runs HMMER to search for matches against a given model. Finally, it merges and trims the matched sequences, counts unique VH-VL pairs, and outputs the results as CSV files.
+This pipeline processes next-generation sequencing (FASTQ) data to identify and quantify functional regions in antibodies. It first translates nucleotide sequences in all six reading frames using SeqKit, then runs HMMER to search for matches against a given model. Finally, it merges and trims the matched sequences, counts unique sequence combinations, and outputs the results as CSV files.
 
 ## Install System Dependencies
 This pipeline requires several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
@@ -13,13 +13,13 @@ conda create -n pipeline_env
 conda acitvate pipeline_env
 
 # Install dependencies 
-conda install -c bioconda jq seqkit  
+conda install -c bioconda seqkit  
 conda install -c bioconda hmmer
 ```
 
 ### Option 2: Using Homebrew (MacOS/Linux)
 ```bash
-brew install jq seqkit hmmer
+brew install seqkit hmmer
 ```
 
 ## How to Use
@@ -31,7 +31,7 @@ Make sure that the following directory paths are correctly set up in your config
   - fastq_path: Path to FASTQ file.
   - model_path: Path to the HMM profile file.
 - matches_outpath: Path to write all matches found by hmmsearch and their sequence information.
-- counts_outpath: Path to write all unique VH/VL pairs found in matches output and their frequency.
+- counts_outpath: Path to write all unique sequence combinations found in matches output and their frequency.
 - min_quality: Minimum quality score for FASTQ filtering.
 
 2. **Run the Script**:
@@ -56,10 +56,9 @@ node main.js -c pipe_configs.json
     - start_pos: Start position for translation (can be 1, 2, 3, -1, -2, or -3). 
 
 
-  2. `counts_outpath`: All unique VH/VL pairs found in ngs_hmm_matches and their frequency.  
-    - vh_sequence: Trimmed heavy sequence.
-    - vl_sequence: Trimmed light sequence. 
-    - count: Count of occurences of each VH/VL pair in matches_outpath. 
+  2. `counts_outpath`: All unique sequence combinations found in ngs_hmm_matches and their frequency.  
+    - {model_name}_seq: Trimmed sequences for each model searched. Each model will have its own CSV column. 
+    - count: Count of occurences of each combination of sequences in matches_outpath. 
 
 ## Workflow
 
@@ -84,10 +83,10 @@ node main.js -c pipe_configs.json
 - Trims sequences based on ali_from and ali_to coordinates from hmmsearch. 
 - Generates final output file `matches_outpath`.
 
-### Step 6: Count Unique VH/VL Pairs (countSeqs) and Write to CSV (writeCSV)
-- Reads `matches_outpath` line-by-line to identify VH/VL pairs by target_name, FASTQ_filename and model_name.
-- Stores pairs in an object and counts frequency of each pair. 
+### Step 6: Count Unique Sequence Combinations (countSeqs) and Write to CSV (writeCSV)
+- Reads `matches_outpath` line-by-line to identify trimmed sequences by target_name and model_name.
+- Counts the occurrences of unique sequence combinations across all targets and formats the results
 - Generates final output file `counts_outpath`
 
-## NOTES
-- The name of your model should contain either 'VH' or 'VL' for successful sequence pairing in countSeqs(). 
+## Notes
+- The name of your model should contain some information about the type of structure being identified (CDR, VH/VL sequence, etc.) for successful sequence pairing in countSeqs(). This information will be extracted and used to name the sequence columns in the final counts_outpath. 
