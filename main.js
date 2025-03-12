@@ -2,11 +2,51 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import csv from "csv-parser";
+import readline from "node:readline";
 import { get_config_by_path, get_config_path_by_args } from "./src/config.js";
 
 /**
- * Define function to process all sequences from fastq
+ * Define function to batch all sequences from fastq
+ * @param {string} fastq_path
+ * @param {string} batchFastqDir
+ * @returns {Promise<void>}
+ */
+async function batchSeqKit(fastq_path, batchFastqDir) {
+	return new Promise((resolve, reject) => {
+		const command = `seqkit split ${fastq_path} -s 500000 -O ${batchFastqDir}`;
+
+		// Execute the seqkit command to split the FASTQ file
+		const seqkitSplit = spawn(command, { shell: true });
+
+		// Handle stdout and stderr for logging
+		seqkitSplit.stdout.on("data", (data) => {
+			console.log(`Output: ${data.toString()}`);
+		});
+
+		seqkitSplit.stderr.on("data", (data) => {
+			console.error(`${data.toString()}`);
+		});
+
+		// Handle process termination
+		seqkitSplit.on("close", (code) => {
+			if (code === 0) {
+				resolve();
+			} else {
+				console.error(`Process exited with code ${code}`);
+				reject(new Error(`Process failed with exit code ${code}`));
+			}
+		});
+
+		// Handle process errors
+		seqkitSplit.on("error", (err) => {
+			console.error(`Failed to start process: ${err.message}`);
+			reject(new Error(`Failed to start process: ${err.message}`));
+		});
+	});
+}
+
+/**
+ * Define function to translate all sequences from fastq
  * @param {string} fastq_path
  * @param {number} min_quality
  * @param {string} fullFastaPath
@@ -30,7 +70,6 @@ async function fullSeqKit(fastq_path, min_quality, fullFastaPath) {
 		// Handle process termination
 		seqkitFull.on("close", (code) => {
 			if (code === 0) {
-				console.log(`Translation completed for: ${fastq_path}`);
 				resolve();
 			} else {
 				console.error(`Process exited with code ${code}`);
@@ -46,8 +85,8 @@ async function fullSeqKit(fastq_path, min_quality, fullFastaPath) {
 
 		// Handle file stream errors
 		fs.createWriteStream(fullFastaPath).on("error", (err) => {
-			console.error(`Failed to write to sample.fasta: ${err.message}`);
-			reject(new Error(`Failed to write to sample.fasta: ${err.message}`));
+			console.error(`Failed to write to temporary fasta: ${err.message}`);
+			reject(new Error(`Failed to write to temporary fasta: ${err.message}`));
 		});
 	});
 }
@@ -56,18 +95,17 @@ async function fullSeqKit(fastq_path, min_quality, fullFastaPath) {
  * Define function to run hmmsearch
  * @param {string} modelPath
  * @param {string} fastaPath
- * @param {string} outputPath
+ * @param {string} domtblPath
  * @param {string} stdoutPath
  * @returns {Promise<void>}
  */
-async function runHMMSearch(modelPath, fastaPath, outputPath, stdoutPath) {
-	// Return a Promise that wraps the asynchronous execution of hmmsearch
+async function runHMMSearch(modelPath, fastaPath, domtblPath, stdoutPath) {
 	return new Promise((resolve, reject) => {
 		const hmmsearch = spawn("hmmsearch", [
 			"-E",
 			"1e-5", // e-value threshold
 			"--domtblout",
-			outputPath, // hmmsearch output is written to specified output file
+			domtblPath,
 			modelPath,
 			fastaPath,
 		]);
@@ -88,9 +126,6 @@ async function runHMMSearch(modelPath, fastaPath, outputPath, stdoutPath) {
 		hmmsearch.on("close", (code) => {
 			// Check exit code to determine if hmmsearch was successful
 			if (code === 0) {
-				console.log(
-					`hmmsearch completed successfully for: ${fastaPath}`,
-				);
 				stdoutStream.end(); // Close the stdout file stream
 				resolve();
 			} else {
@@ -102,66 +137,72 @@ async function runHMMSearch(modelPath, fastaPath, outputPath, stdoutPath) {
 }
 
 /**
- * Define function to parse full hmmsearch output
- * @param {string} hmmerOut
- * @returns {Promise<Array<{
- * target_name: string,
- * score: number,
- * e_value: number,
- * ali_from: number,
- * ali_to: number}>>}
+ * Define function to parse full hmmsearch output, determine best hit per target and generate a BED file
+ * @param {string} domtblPath - Path to the hmmsearch domtblout file
+ * @param {string} bedFilePath - Path to output the BED file
+ * @returns {Promise<void>}
  */
-async function parseFullHMMOutput(hmmerOut) {
+async function extractBestHMMHits(domtblPath, bedFilePath) {
 	try {
-		const lines = (await fs.promises.readFile(hmmerOut, "utf8")).split("\n");
-		const parsedData = [];
+		// Create readable stream for hmmer output
+		const fileStream = fs.createReadStream(domtblPath, "utf8");
+
+		// Create readline interface to read the file line by line
+		const rl = readline.createInterface({
+			input: fileStream,
+			crlfDelay: Number.POSITIVE_INFINITY,
+		});
+
+		/** @type {Map<string, { target_name: string, score: number, ali_from: number, ali_to: number }>} */
+		const bestEntries = new Map(); // Initialize map to store highest-scoring hmmsearch hit for each target sequence
 
 		// Parse valid entries
-		for (const line of lines) {
+		for await (const line of rl) {
 			if (line.startsWith("#") || line.trim() === "") {
-				continue;
+				continue; // Skip comment/empty lines
 			}
 
 			const columns = line.trim().split(/\s+/);
 			if (columns.length < 23) {
-				continue;
+				continue; // Skip lines that don't have enough columns
 			}
 
 			// Extract relevant columns
 			const entry = {
 				target_name: columns[0], // Target sequence name
 				score: Number.parseFloat(columns[7]), // Bit score
-				e_value: Number.parseFloat(columns[6]), // E-value
 				ali_from: Number.parseInt(columns[17], 10), // Alignment start
 				ali_to: Number.parseInt(columns[18], 10), // Alignment end
 			};
 
-			parsedData.push(entry);
-		}
+			// Group entries by target_name and store the highest-scoring hit
+			const key = entry.target_name.split("_frame=")[0]; // Strip out frame info for unique target name
+			const entryForTarget = bestEntries.get(key);
 
-		/**
-		 * bestEntries: Record to store highest-scoring hmmsearch hit for each target sequence
-		 * @type {Record<string, {target_name: string, score: number, e_value: number, ali_from: number, ali_to: number} >}
-		 * */
-		const bestEntries = {};
-
-		// Group entries by target_name and select the highest scoring row per target
-		for (const entry of parsedData) {
-			const key = entry.target_name;
-			const entryForTarget = bestEntries[key];
-
-			// Keep the highest-scoring entry per target_name
-			if (entryForTarget === undefined) {
-				bestEntries[key] = entry; // if this is the first time encountering this target, save it to bestEntries
-			} else if (entryForTarget.score < entry.score) {
-				bestEntries[key] = entry; // if this entry of target is greater than the current bestEntries, replace
+			if (entryForTarget === undefined || entryForTarget.score < entry.score) {
+				bestEntries.set(key, entry); // If this is the highest score, update it
 			}
 		}
 
-		return Object.values(bestEntries);
+		// Generate the BED file content
+		/** @type {string[]} bedContent - An array of strings, where each string represents a line in the BED file */
+		const bedContent = [];
+        for (const entry of bestEntries.values()) {
+            // Format the BED file line
+            const bedLine = [
+                entry.target_name, // Target name
+                entry.ali_from - 1, // Start position (BED format is 0-based)
+                entry.ali_to, // End position
+                entry.score, // Bit score
+            ].join("\t");
+            bedContent.push(bedLine);
+        } 
+        
+		// Write the BED content to a file
+		fs.writeFileSync(bedFilePath, bedContent.join("\n"));
 	} catch (error) {
 		if (error instanceof Error) {
-			console.error(`Error parsing hmmsearch output: ${error.message}`);
+			console.error(error.message);
 		} else {
 			console.error("Unknown error occurred.");
 		}
@@ -170,230 +211,219 @@ async function parseFullHMMOutput(hmmerOut) {
 }
 
 /**
- * Define function to parse FASTA file and store sequences by target_name
- * @param {string} fastaFilePath
- * @returns {Promise<Object<string, string>>}
+ * Define function to trim sequences based on coordinates from HMMER
+ * @param {string} inFastaFilePath - Path to input fasta file (raw protein sequences)
+ * @param {string} bedFilePath - Path to BED file with trimming coordinates from each HMMER hit
+ * @param {string} outFastaFilePath
+ * @returns {Promise<string>}
  */
-async function parseFasta(fastaFilePath) {
-	try {
-		const data = await fs.promises.readFile(fastaFilePath, "utf8");
-		const lines = data.trim().split("\n");
-		/**
-		 * sequences: Object to store parsed sequences
-		 * @type {Record<string, string>}
-		 * */
-		const sequences = {};
-
-		// Temporary variables to store current sequence data
-		let targetName = "";
-		let sequence = "";
-
-		for (const line of lines) {
-			if (line.startsWith(">")) {
-				// Save the previous sequence when a new header line is detected
-				if (targetName) {
-					sequences[targetName] = sequence;
-				}
-				// Extract target name and reset sequence
-				targetName = line.substring(1).split(" ")[0];
-				sequence = "";
-			} else {
-				// Append sequence data
-				sequence += line.trim();
-			}
-		}
-
-		// Ensure the last sequence in file is added to the object
-		if (targetName) {
-			sequences[targetName] = sequence;
-		}
-
-		return sequences;
-	} catch (error) {
-		if (error instanceof Error) {
-			console.error(`Error parsing FASTA file: ${error.message}`);
-		} else {
-			console.error("Unknown error occurred.");
-		}
-		throw error;
-	}
-}
-
-/**
- * Define function to merge HMMER output and fasta sequences by target_name
- * @param {string} hmmerFilePath
- * @param {string} fastaFilePath
- * @param {string} fastqFilePath
- * @param {string} hmmFilePath
- * @returns {Promise<Array<{
- * target_name: string,
- * score: number,
- * e_value: number,
- * ali_from: number,
- * ali_to: number,
- * sequence: string,
- * FASTQ_filename: string,
- * model_name: string,
- * trimmed_seq: string,
- * seq_len: number,
- * start_pos: number}>>}
- */
-async function mergeData(
-	hmmerFilePath,
-	fastaFilePath,
-	fastqFilePath,
-	hmmFilePath,
-) {
-	// Parse HMMER output and FASTA file
-	const [hmmerData, fastaData] = await Promise.all([
-		parseFullHMMOutput(hmmerFilePath),
-		parseFasta(fastaFilePath),
-	]);
-
-	// Extract filenames from paths
-	const fastqFilename = fastqFilePath.split("/").pop() || "";
-	const modelName = hmmFilePath.split("/").pop() || "";
-
-	// Create array
-	const mergedData = [];
-
-	for (const entry of hmmerData) {
-		const fullSequence = fastaData[entry.target_name]; // Extract full sequence for target_name from the fasta file
-		const trimmedSeq = fullSequence.slice(entry.ali_from - 1, entry.ali_to); // Trim sequence
-		const seqLen = trimmedSeq.length; // Calculate trimmed sequence length
-
-		// Extract start position from target_name
-		const match = entry.target_name.match(/frame=(-?\d+)/);
-		const startPos = match ? Number.parseInt(match[1], 10) : 0; // if no match is found, startPos is set to 0
-
-		// Remove "frame=" information from target_name
-		const cleanedTargetName = entry.target_name
-			.replace(/_frame=-?\d+/, "")
-			.trim();
-
-		mergedData.push({
-			...entry,
-			target_name: cleanedTargetName,
-			sequence: fullSequence, // Attach full FASTA sequence
-			FASTQ_filename: fastqFilename,
-			model_name: modelName, // HMM filename
-			trimmed_seq: trimmedSeq,
-			seq_len: seqLen,
-			start_pos: startPos, // Start position for translation
-		});
-	}
-
-	return mergedData;
-}
-
-/**
- * Define function to count occurrences of unique sequence combinations for all model_names
- * @param {string} mergedDataPath
- * @returns {Promise<Array<Record<string, any>>>} - each object in array represents a unique sequence combination and its count
- */
-async function countSeqs(mergedDataPath) {
+async function trimSeqs(inFastaFilePath, bedFilePath, outFastaFilePath) {
 	return new Promise((resolve, reject) => {
-		/**
-		 * targetSequences: Object to store trimmed sequence data, indexed by target_name
-		 * Each target_name maps to an object containing model_name keys with their respective trimmed sequences
-		 * @type {Object.<string, Object.<string, string>>}
-		 */
-		const targetSequences = {};
+		const command = `seqkit subseq --bed ${bedFilePath} ${inFastaFilePath} > ${outFastaFilePath}`;
+		const seqkitSubseq = spawn(command, { shell: true });
 
-		fs.createReadStream(mergedDataPath)
-			.pipe(csv()) // Parse CSV file line by line
-			.on("data", (entry) => {
-				const { target_name, model_name, trimmed_seq } = entry;
-				const modelKey = model_name.toLowerCase();
+		let output = "";
+		let errorOutput = "";
 
-				// Initialize target entry if missing
-				if (!targetSequences[target_name]) {
-					targetSequences[target_name] = {};
-				}
-
-				// Assign trimmed sequence to the corresponding model_name
-				targetSequences[target_name][modelKey] ??= trimmed_seq;
-			})
-			.on("end", () => {
-				/**
-				 * seqCounts: Object to store counts of unique sequence combos across all targets
-				 * @type {Object.<string, { sequences: object, count: number }>}
-				 */
-				const seqCounts = {};
-
-				for (const sequences of Object.values(targetSequences)) {
-					// Create unique key for this sequence combination
-					const seqKey = Object.entries(sequences)
-						.sort(([keyA], [keyB]) => keyA.localeCompare(keyB)) // Sort model names for consistency
-						.map(([model, seq]) => `${model}:${seq}`) // Convert each model-seq pair to string
-						.join("|"); // Create single key by joining strings
-
-					// Increment count for this unique sequence combination
-					if (!seqCounts[seqKey]) {
-						seqCounts[seqKey] = { sequences, count: 0 };
-					}
-					seqCounts[seqKey].count++;
-				}
-
-				// Convert object into an array and sort by descending count
-				const sortedResults = Object.values(seqCounts).sort(
-					(a, b) => b.count - a.count,
-				);
-
-				/// Format data for CSV output
-				const formattedResults = sortedResults.map(({ sequences, count }) => ({
-					...Object.fromEntries(
-						Object.entries(sequences).map(([model, seq]) => [
-							`${model.replace(/\.[^.]+$/, "")}_seq`, // Remove file extension
-							seq,
-						]),
-					),
-					count,
-				}));
-
-				resolve(formattedResults);
-			})
-			.on("error", (error) => reject(error));
+		// Capture data from stdout stream (trimmed seqs)
+		seqkitSubseq.stdout.on("data", (data) => {
+            output += data.toString();
+        });
+        
+        seqkitSubseq.stderr.on("data", (data) => {
+            errorOutput += data.toString();
+        });
+        
+        seqkitSubseq.on("close", (code) => {
+            if (code === 0) {
+                resolve(output);
+            } else {
+                console.error(`seqkit subseq failed with exit code ${code}: ${errorOutput}`);
+                reject(new Error(`Command failed with exit code ${code}: ${errorOutput}`));
+            }
+        });
+        
+        seqkitSubseq.on("error", (err) => {
+            console.error("Failed to start seqkit process:", err.message);
+        });
 	});
 }
 
 /**
- * Define function to write/append merged output to CSV
- * @param {string} outputFile
- * @param {Array<Record<string, any>>} data
- * @param {boolean} append
+ * Define function to map target names to sequences
+ * @param {string} trimmedFastaPath - Path to the FASTA file
+ * @param {string} modelName - Model name
+ * @param {string} fastqName - Fastq name
+ * @param {Map<string, { model: string; sequence: string }[]>} seqMap - Existing map to append sequences
+ * @returns {Promise<Map<string, { model: string; sequence: string }[]>>} - Updated sequence map
  */
-async function writeCsv(outputFile, data, append = false) {
+async function mapFastaSeqs(trimmedFastaPath, modelName, fastqName, seqMap = new Map()) {
+	return new Promise((resolve, reject) => {
+		/** @type {string | null} */
+		let target_name = null;
+		let currentSequence = "";
+
+		const stream = readline.createInterface({
+			input: fs.createReadStream(trimmedFastaPath),
+			output: process.stdout,
+			terminal: false,
+		});
+
+		stream.on("line", (line) => {
+			if (line.startsWith(">")) {
+				if (target_name && currentSequence) {
+					// If 'target_name' is not found in the Map assign an empty array
+					const sequences = seqMap.get(target_name) ?? [];
+					// Append sequence for the current model and target
+					sequences.push({
+						model: modelName,
+						sequence: currentSequence.trim(),
+					});
+					seqMap.set(target_name, sequences); // Save it back to map
+				}
+
+				// Extract target name before "_frame"
+				target_name = line.replace(/^>(.*?)_frame.*/, "$1").trim();
+                // Append the FASTQ file name to make it unique
+                target_name = `${target_name}|${fastqName}`;
+				currentSequence = ""; // Reset sequence for new target
+			} else {
+				currentSequence += line.trim(); // Append sequence data
+			}
+		});
+
+		stream.on("close", () => {
+			if (target_name && currentSequence) {
+				const sequences = seqMap.get(target_name) ?? [];
+				// Save the last sequence for the current target
+				sequences.push({ model: modelName, sequence: currentSequence.trim() });
+				seqMap.set(target_name, sequences);
+			}
+            console.log(`Finished processing. Current seqMap size: ${seqMap.size}`);
+			console.log("SeqMap:", seqMap)
+			resolve(seqMap);
+		});
+
+		stream.on("error", (err) => reject(err));
+	});
+}
+
+/**
+ * Define function to count occurrences of unique sequence combinations
+ * @param {Map<string, { model: string, sequence: string }[]>} seqMap
+ * @returns {Promise<Array<{ [key: string]: string | number }>>}
+ */
+async function countSeqs(seqMap) {
 	try {
-		const header = Object.keys(data[0]);
-		const rows = data.map((row) =>
-			header.map((col) => row[col] || "").join(","),
-		);
-		const csvContent = rows.join("\n");
+		const allModels = new Set();
+		const targetSequences = new Map();
 
-		// Check if the file exists and append data instead of overwriting
-		if (append && fs.existsSync(outputFile)) {
-			fs.appendFileSync(outputFile, `\n${csvContent}`, "utf8");
-		} else {
-			fs.writeFileSync(
-				outputFile,
-				[header.join(","), csvContent].join("\n"),
-				"utf8",
-			);
+		// Collect sequences per trimmed target name
+		for (const [target_name, entries] of seqMap) {
+			const trimmedTargetName = target_name.replace(/\|.*$/, "");
+
+			if (!targetSequences.has(trimmedTargetName)) {
+				targetSequences.set(trimmedTargetName, []);
+			}
+
+			// Store each frame's sequences as a new entry for this target
+			const modelSequences = new Map();
+
+			// Track missing models for this target
+			let missingModels = new Set(allModels);
+
+			for (const { model, sequence } of entries) {
+				// Store sequence by model
+				modelSequences.set(model, sequence);
+				allModels.add(model); // Add model to allModels set
+
+				// Remove model from missingModels since it's found
+				missingModels.delete(model);
+			}
+
+			// If there are any missing models for this target, skip it
+			if (missingModels.size > 0) {
+				continue; 
+			}
+
+			// Store valid model sequences for this target
+			targetSequences.get(trimmedTargetName).push(modelSequences);
 		}
 
-		console.log(`CSV updated: ${outputFile}`);
+		// Convert Set to an array for consistent ordering of models
+		const allModelNames = Array.from(allModels);
+
+		const seqCounts = new Map();
+
+		// Count unique sequence combinations across all targets
+		for (const sequenceLists of targetSequences.values()) {
+			for (const sequences of sequenceLists) {
+				// Create a unique key for each sequence combination
+				const seqKey = allModelNames
+					.map((model) => `${model}:${sequences.get(model)}`)
+					.join("|");
+
+				if (!seqCounts.has(seqKey)) {
+					seqCounts.set(seqKey, {
+						sequences: Object.fromEntries(sequences),
+						count: 0,
+					});
+				}
+
+				seqCounts.get(seqKey).count++;
+			}
+		}
+
+		// Convert results to sorted array
+		return Array.from(seqCounts.values())
+			.sort((a, b) => b.count - a.count)
+			.map(({ sequences, count }) => ({
+				...Object.fromEntries(
+					Object.entries(sequences).map(([model, seq]) => [
+						`${model.replace(/\.[^.]+$/, "")}_seq`, // Remove file extension
+						seq,
+					]),
+				),
+				count,
+			}));
 	} catch (error) {
-		if (error instanceof Error) {
-			console.error(`Error writing CSV: ${error.message}`);
-		} else {
-			console.error("Unknown error occurred.");
-		}
+		console.error("Error processing sequence counts:", error);
 		throw error;
 	}
 }
 
-// Define main function
+/**
+ * Write data to a CSV file
+ * @param {Array<{[key: string]: string | number}>} data
+ * @param {string} outputPath
+ */
+function writeCSV(data, outputPath) {
+	if (data.length === 0) {
+		console.log("No data to write.");
+		return;
+	}
+
+	// Collect all unique headers across data entries
+	const allHeaders = new Set();
+    for (const row of data) {
+        for (const key of Object.keys(row)) {
+            allHeaders.add(key);
+        }
+    }
+    const headers = Array.from(allHeaders);
+
+	// Convert data to CSV format
+	const csvRows = [
+		headers.join(","), // Header row
+		...data.map(
+			(row) => headers.map((col) => row[col] || "NA").join(","), // Data rows
+		),
+	];
+
+	// Write CSV to file
+	fs.writeFileSync(outputPath, csvRows.join("\n"), "utf8");
+}
+
 async function main() {
 	// Read config
 	const config_path = await get_config_path_by_args();
@@ -404,70 +434,115 @@ async function main() {
 	}
 
 	// Extract parameters from config object
-	const { matches_outpath, counts_outpath, min_quality, input_pairs } = config;
+	const { counts_outpath, min_quality, input_pairs } = config;
 
-	// Create temporary directory for intermediate files
-	const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "processing-"));
+	// Create temporary directory to store intermediate output
+	const mainTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "main-"));
+	const batchTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "batch-")); // base directory to store split fastq files
+
+	// Create a map to store the split FASTQ paths and their corresponding model paths
+	const split_input_pairs = new Map();
+
+	// Split all FASTQ files
+	for (const { fastq_path, model_path } of input_pairs) {
+		console.log(`Splitting fastq files for: ${fastq_path}`);
+
+		// Extract filename without extension for unique directory
+		const fastqBaseName = path.basename(fastq_path, path.extname(fastq_path));
+		const modelName = path.basename(model_path, path.extname(model_path));
+
+		// Define a unique subdirectory inside batchTempDir
+		const fastqOutputDir = path.join(batchTempDir, fastqBaseName, modelName);
+
+		// Ensure batchSeqKit uses a unique directory for each FASTQ file
+		await batchSeqKit(fastq_path, fastqOutputDir);
+
+		// Read the split files inside the output directory
+		const splitFiles = fs
+			.readdirSync(fastqOutputDir)
+			.filter((f) => f.endsWith(".fastq.gz") || f.endsWith(".fastq")) // Allow both zipped and unzipped FASTQ files
+			.map((f) => path.join(fastqOutputDir, f)); // Get full paths
+
+		if (splitFiles.length === 0) {
+			throw new Error(`No FASTQ files found in ${fastqOutputDir}`);
+		}
+
+		// Store each split file separately with the corresponding model
+		for (const file of splitFiles) {
+			split_input_pairs.set(file, model_path);
+		}
+	}
+
+    console.log("split_input_pairs:", split_input_pairs);
 
 	try {
-		// Loop over input pairs
-		for (const { fastq_path, model_path } of input_pairs) {
-			console.log(`Processing: ${fastq_path} with model ${model_path}`);
+		// Initialize empty map for sequences
+		/** @type {Map<string, { model: string; sequence: string }[]>} */
+		let seqMap = new Map();
 
-			// Define intermediate output paths within temp directory
-			const fullFastaPath = path.join(tempDir, "full.fasta");
-			const domtbloutPath = path.join(tempDir, "hmmsearch_out.tbl");
-			const stdoutPath = path.join(tempDir, "hmmer_stdout.tbl");
+		for (const [split_fastq_path, model_path] of split_input_pairs) {
+			console.log(`Processing: ${split_fastq_path} with model ${model_path}`);
 
-			try {
-				// Translate sequences in all 6 frames
-				await fullSeqKit(fastq_path, min_quality, fullFastaPath);
+			// Extract file names
+            const fastqName = path.basename(split_fastq_path, path.extname(split_fastq_path));
+            const modelName = path.basename(model_path, path.extname(model_path));
 
-				// Run HMMER on all translated sequences
-				await runHMMSearch(
-					model_path,
-					fullFastaPath,
-					domtbloutPath,
-					stdoutPath,
-				);
+            // Define intermediate file paths
+            const translatedFastaPath = path.join(mainTempDir, `${fastqName}_${modelName}_translated.fasta`);
+            const domtblPath = path.join(mainTempDir, `${fastqName}_${modelName}.domtblout`);
+            const stdoutPath = path.join(mainTempDir, `${fastqName}_${modelName}.stdout`);
+            const bedOut = path.join(mainTempDir, `${fastqName}_${modelName}_output.bed`);
+			const trimmedFasta = path.join(mainTempDir, `${fastqName}_${modelName}_trimmed.fasta`);
 
-				// Merge hmmsearch results with sequence information and trim based on match results
-				const mergedData = await mergeData(
-					domtbloutPath,
-					fullFastaPath,
-					fastq_path,
-					model_path,
-				);
+			// Translate in all 6 reading frames
+			console.log(`Translating: ${split_fastq_path}...`);
+			await fullSeqKit(split_fastq_path, min_quality, translatedFastaPath);
 
-				await writeCsv(matches_outpath, mergedData, true);
-				console.log("Matches written to:", matches_outpath);
-			} catch (error) {
-				if (error instanceof Error) {
-					console.error(error.message);
-				} else {
-					console.error("Unknown error occurred.");
-				}
-				throw error;
-			}
+			// Run HMMER on all translated sequences
+			console.log(
+				`Running hmmsearch for: ${split_fastq_path} with model ${model_path}...`,
+			);
+			await runHMMSearch(
+				model_path,
+				translatedFastaPath,
+				domtblPath,
+				stdoutPath,
+			);
+
+			// Generate BED file of best hits and their alignment coordinates
+			console.log(
+				`Mapping trimmed sequences to target names for: ${split_fastq_path}...`,
+			);
+			await extractBestHMMHits(domtblPath, bedOut);
+
+			// Trim sequences based on alignment coordinates
+			await trimSeqs(translatedFastaPath, bedOut, trimmedFasta);
+
+			seqMap = await mapFastaSeqs(trimmedFasta, modelName, fastqName, seqMap); // Update seqMap with each FASTA file
 		}
 
-		// Count unique VH/VL pairs after all input pairs are processed
-		try {
-			const countData = await countSeqs(matches_outpath);
-			await writeCsv(counts_outpath, countData, true);
-			console.log("Final counts written to:", counts_outpath);
-		} catch (error) {
-			if (error instanceof Error) {
-				console.error("Error in countSeqs:", error.message);
-			} else {
-				console.error("Unknown error occurred.");
-			}
-			throw error;
+		// Once all sequences have been added to seqMap, count the sequences
+		console.log("Generating count file...");
+		const seqCounts = await countSeqs(seqMap);
+
+		// Save counts as csv
+		await writeCSV(seqCounts, counts_outpath);
+		console.log(`Counts saved to: ${counts_outpath}`);
+
+		return seqCounts;
+	} catch (error) {
+		if (error instanceof Error) {
+			console.error(error.message);
+		} else {
+			console.error("Unknown error occurred.");
 		}
+		throw error;
 	} finally {
-		// Remove temporary directory and all its contents
-		fs.rmSync(tempDir, { recursive: true, force: true });
-		console.log("Temporary files removed. Pipeline completed!");
+		// Remove temporary directories and all contents
+		// console.log("Cleaning up temporary files...");
+		// fs.rmSync(mainTempDir, { recursive: true, force: true });
+		// fs.rmSync(batchTempDir, { recursive: true, force: true });
+		console.log("Pipeline completed!");
 	}
 }
 
