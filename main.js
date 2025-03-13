@@ -539,9 +539,9 @@ async function main() {
 		throw error;
 	} finally {
 		// Remove temporary directories and all contents
-		// console.log("Cleaning up temporary files...");
-		// fs.rmSync(mainTempDir, { recursive: true, force: true });
-		// fs.rmSync(batchTempDir, { recursive: true, force: true });
+		console.log("Cleaning up temporary files...");
+		fs.rmSync(mainTempDir, { recursive: true, force: true });
+		fs.rmSync(batchTempDir, { recursive: true, force: true });
 		console.log("Pipeline completed!");
 	}
 }
