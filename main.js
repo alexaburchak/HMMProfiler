@@ -70,7 +70,23 @@ async function fullSeqKit(fastq_path, min_quality, fullFastaPath) {
 		// Handle process termination
 		seqkitFull.on("close", (code) => {
 			if (code === 0) {
-				resolve();
+				
+				// After the process finishes, check if the output FASTA file is empty
+                fs.stat(fullFastaPath, (err, stats) => {
+                    if (err) {
+                        console.error(`Error checking file stats: ${err.message}`);
+                        reject(new Error(`Error checking file stats: ${err.message}`));
+                        return;
+                    }
+
+                    if (stats.size === 0) {
+                        // If the file is empty, suggest lowering the min_quality threshold
+                        reject(new Error(`No sequences found in fasta file. Try lowering the 'min_quality' threshold!`));
+                    } else {
+						console.log(`Translated sequences saved to: ${fullFastaPath}`)
+                        resolve();
+                    }
+                });
 			} else {
 				console.error(`Process exited with code ${code}`);
 				reject(new Error(`Process failed with exit code ${code}`));
@@ -354,6 +370,7 @@ async function countSeqs(seqMap) {
 		const allModelNames = Array.from(allModels);
 
 		const seqCounts = new Map();
+		let totalCombinations = 0; // Track total combinations for frequency calculation
 
 		// Count unique sequence combinations across all targets
 		for (const sequenceLists of targetSequences.values()) {
@@ -371,6 +388,7 @@ async function countSeqs(seqMap) {
 				}
 
 				seqCounts.get(seqKey).count++;
+				totalCombinations++;
 			}
 		}
 
@@ -385,6 +403,7 @@ async function countSeqs(seqMap) {
 					]),
 				),
 				count,
+				frequency: Math.round((count / totalCombinations) * 100000) / 100000, // Rounds to 5 decimal places
 			}));
 	} catch (error) {
 		console.error("Error processing sequence counts:", error);
@@ -500,7 +519,7 @@ async function main() {
 
 			// Run HMMER on all translated sequences
 			console.log(
-				`Running hmmsearch for: ${split_fastq_path} with model ${model_path}...`,
+				`Running hmmsearch for: ${translatedFastaPath} with model ${model_path}...`,
 			);
 			await runHMMSearch(
 				model_path,
@@ -511,7 +530,7 @@ async function main() {
 
 			// Generate BED file of best hits and their alignment coordinates
 			console.log(
-				`Mapping trimmed sequences to target names for: ${split_fastq_path}...`,
+				`Mapping trimmed sequences to target names for: ${trimmedFasta}...`,
 			);
 			await extractBestHMMHits(domtblPath, bedOut);
 
