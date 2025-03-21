@@ -316,7 +316,6 @@ async function mapFastaSeqs(trimmedFastaPath, modelName, fastqName, seqMap = new
 				seqMap.set(target_name, sequences);
 			}
             console.log(`Finished processing. Current seqMap size: ${seqMap.size}`);
-			console.log("SeqMap:", seqMap)
 			resolve(seqMap);
 		});
 
@@ -403,7 +402,7 @@ async function countSeqs(seqMap) {
 					]),
 				),
 				count,
-				frequency: Math.round((count / totalCombinations) * 100000) / 100000, // Rounds to 5 decimal places
+				frequency: count / totalCombinations 
 			}));
 	} catch (error) {
 		console.error("Error processing sequence counts:", error);
