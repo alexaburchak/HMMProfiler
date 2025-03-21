@@ -1,0 +1,7 @@
+{
+    "input_pairs": [
+        {"fastq_path": "/Users/alexaburchak/Desktop/super_cool_input/big.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"}
+    ],
+    "counts_outpath": "/Users/alexaburchak/Desktop/super_cool_output/big_ngs_hmm_counts.csv",
+    "min_quality": 20
+}
