@@ -397,7 +397,7 @@ async function countSeqs(seqMap) {
 			.map(({ sequences, count }) => ({
 				...Object.fromEntries(
 					Object.entries(sequences).map(([model, seq]) => [
-						`${model.replace(/\.[^.]+$/, "")}_seq`, // Remove file extension
+						`${model.replace(/\.[^.]+$/, "")}`, // Remove file extension
 						seq,
 					]),
 				),
