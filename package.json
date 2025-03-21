@@ -2,7 +2,7 @@
   "name": "ngs_pipeline",
   "version": "1.0.0",
   "description": "This pipeline processes next-generation sequencing (FASTQ) data to identify and quantify functional regions in antibodies. It first translates nucleotide sequences in all six reading frames using SeqKit, then runs HMMER to search for matches against a given model. Finally, it merges and trims the matched sequences, counts unique sequence combinations, and outputs the count results as a CSV file.",
-  "main": "main.js",
+  "main": "counts_pipeline.js",
   "type": "module",
   "scripts": {
     "format-check": "biome format .",
