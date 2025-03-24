@@ -1,10 +1,10 @@
-# Pipeline for Identifying Functional Regions in Antibodies from NGS Data
+# Pipeline for Identifying Functional Regions and Matching Sequences in Antibodies from NGS Data
 
 ## Overview
-This pipeline processes next-generation sequencing (FASTQ) data to identify and quantify functional regions in antibodies. It first translates nucleotide sequences in all six reading frames using SeqKit, then runs HMMER to search for matches against a given model. Finally, it merges and trims the matched sequences, counts unique sequence combinations, and outputs the count results as a CSV file.
+This repository contains two main pipelines for processing next-generation sequencing (FASTQ) data to identify and quantify functional regions in antibodies. The first pipeline (counts_pipeline.js) processes raw sequencing data, translates nucleotide sequences, and counts unique sequence combinations. The second pipeline (matches_pipeline.js) takes the output from the first pipeline and matches query sequences against identified functional regions to find the closest matches. These pipelines provide an end-to-end solution for processing NGS data, identifying functional antibody regions, and matching them against query sequences.
 
 ## Install System Dependencies
-This pipeline requires several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
+Both pipelines require several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
 
 ### Option 1: Using Conda (Preferred)
 ```bash
@@ -23,60 +23,89 @@ conda install -c bioconda hmmer -y
 brew install seqkit hmmer
 ```
 
-## How to Use
+## Pipeline 1: Identifying Functional Regions (`counts_pipeline.js`)
 
-1. **Configure Necessary Parameters**
-Make sure that the following directory paths are correctly set up in your configuration file (pipe_configs.json):
+### How to use 
 
-- input_pairs: 
-  - fastq_path: Path to FASTQ file.
-  - model_path: Path to the HMM profile file.
-- counts_outpath: Path to write all unique sequence combinations found in matches output and their frequency.
-- min_quality: Minimum quality score for FASTQ filtering.
+1. **Prepare Configuration File (`count_parameters.json`)**
+- `input_pairs`: Array of objects containing: 
+  - `fastq_path`: Path to FASTQ file.
+  - `model_path`: Path to the HMM profile.
+- `counts_outpath`: Path to write all unique sequence combinations found in matches output and their frequency.
+- `min_quality`: Minimum quality score for FASTQ filtering.
 
 2. **Run the Script**:
-Assuming your config file is named pipe_configs.json, from the command line you can run: 
+Assuming your config file is named count_parameters.json, from the command line you can run: 
 ```bash
-node main.js -c pipe_configs.json
+node counts_pipeline.js -c count_parameters.json
 ```
 
 3. **Outputs**
-- The pipeline outputs one csv file that is saved to the assigned output path:
-  1. `counts_outpath`: All unique sequence combinations found and their frequency.  
-    - {model_name}_seq: Trimmed sequences for each model searched. Each model will have its own CSV column. 
-    - count: Count of occurences of each combination of sequences in matches_outpath. 
+The pipeline generates a CSV file at `counts_outpath` containing:: 
+    - `{model_name}_seq`: Trimmed sequences for each model searched. Each model will have its own CSV column. 
+    - `count`: Count of occurences of each combination of sequences in matches_outpath. 
+    - `frequency`: Frequency of each sequence combination relative to all detected combinations.
 
-## Workflow
+### Workflow
 
-### Step 1: Set Parameters
-- Reads config file and extract parameters. 
-- Defines path for final output file.
+**1. Set Parameters** - Reads the config file and defines output paths.
 
-### Step 2: Quality Filtering and Translation (fullSeqKit)
-- Filters sequences using `seqkit` with a minimum quality threshold of set in your config file.
-- Translates DNA sequences into amino acid sequences in all reading frames.
-- Outputs translated reads to FASTA format.
+**2. Quality Filtering and Translation** - Filters sequences, translates them into amino acid sequences, and saves results in FASTA format.
 
-### Step 3: Run HMMER (runHMMSearch)
-- Runs `hmmsearch` with provided HMM model.
-- Saves HMMER output to temporary domain table file (.tbl). 
+**3. Run HMMER** - Searches sequences against the provided HMM model using `hmmsearch`.
 
-### Step 4: Extract Best HMMER Hits (extractBestHMMHits)
-- Parses the .domtblout file to extract the highest-scoring hit per target.
-- Generates a BED file containing alignment coordinates for the best matches. 
+**4. Extract Best HMMER Hits** - Generates a BED file containing alignment coordinates for the highest-scoring match per sequence. 
 
-### Step 5: Trim Sequences Based on HMMER Hits (trimSeqs)
-- Uses seqkit subseq to extract trimmed sequences based on coordinates from the BED file.
-- Outputs trimmed sequences in FASTA format.
+**5. Trim Sequences Based on HMMER Hits** - Extracts trimmed sequences based on alignment coordinates from the BED file.
 
-### Step 6: Map Trimmed Sequences to Targets (mapFastaSeqs)
-- Reads the trimmed FASTA file and maps sequences to their corresponding target names and models.
-- Organizes data in a structured map format.
+**6. Map Trimmed Sequences to Targets** - Maps trimmed sequences to their corresponding target names and models.
 
-### Step 7: Count Unique Sequence Combinations (countSeqs) and Write Results to CSV (writeCSV)
-- Aggregates unique sequence combinations based on mapped sequences.
-- Counts occurrences across all targets and models.
-- Saves final results as a CSV file to `counts_outpath`.
+**7. Count Unique Sequence Combinations** - Aggregates and counts unique sequence occurrences.
+
+**8. Save Counts to CSV** - Outputs a count and frequency for each unique sequence combination.
+
+## Pipeline 2: Matching Query Sequences (`matches_pipeline.js`)
+
+### How to use
+
+1. **Prepare Configuration File (`match_parameters.json`)**
+- `input_list`: Array of objects containing: 
+  - `query_path`: Path to query sequence(s), can be FASTA or a raw sequence string.
+  - `model_path`: Path to the HMM profile.
+  - `csv_path`: Path to the output CSV from `counts_pipeline.js`.
+  - `output_path`: Path for saving match results.
+- `max_LD`: Maximum Levenshtein distance for matching sequences. 
+
+2. **Run the Script**:
+Assuming your config file is named count_parameters.json, from the command line you can run: 
+```bash
+node matches_pipeline.js -c match_parameters.json
+```
+
+3. **Outputs**
+The pipeline generates a CSV file at `output_path` containing:: 
+    - `query_sequence`: Query sequence from the input. 
+    - `levenshtein_dist`: Distance between the query and closest match.
+    - `matched_modelname`: Name of the matched functional region.
+    - Additional columns from `counts_pipeline.js` output. 
+
+### Workflow
+
+**1. Load Configuration** - Reads input parameters from match_parameters.json.
+
+**2. Run HMMER on Query Sequences** - Searches for query sequences against the specified HMM model.
+
+**3. Extract Best Hits** - Identifies the best-matching functional region.
+
+**4. Trim Sequences** - Extracts relevant portions of query sequences.
+
+**5. Find Closest Matches** - Compares query sequences to known functional regions using Levenshtein distance.
+
+**6. Save Matches to CSV** - Outputs the closest matches for each query sequence.
 
 ## Notes
-- The name of your model should contain some information about the type of structure being identified (CDR, VH/VL sequence, etc.) for successful sequence pairing in countSeqs(). This information will be extracted and used to name the sequence columns in the final counts_outpath. 
+- Ensure that model names contain information about the type of structure (e.g., CDR, VH/VL) for accurate sequence pairing. This information will be extracted and used to name the sequence columns in `counts_outpath`. 
+
+- Temporary files generated during processing are automatically cleaned up.
+
+- The matching pipeline allows direct input of raw sequences if a FASTA file is not provided.
