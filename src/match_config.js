@@ -18,29 +18,29 @@ import yargs from "yargs/yargs";
 
 /**
  * Validates whether the given input is an input_list object
- * @param {any} maybe_input_pair
+ * @param {any} maybe_input_list
  * @returns {boolean}
  */
-function is_input_pair(maybe_input_pair) {
-	if (typeof maybe_input_pair !== "object") {
+function is_input(maybe_input_list) {
+	if (typeof maybe_input_list !== "object") {
 		return false;
 	}
-	if (maybe_input_pair === null) {
+	if (maybe_input_list === null) {
 		return false;
 	}
-	const query_path = maybe_input_pair.query_path;
+	const query_path = maybe_input_list.query_path;
 	if (typeof query_path !== "string") {
 		return false;
 	}
-	const model_path = maybe_input_pair.model_path;
+	const model_path = maybe_input_list.model_path;
 	if (typeof model_path !== "string") {
 		return false;
 	}
-	const csv_path = maybe_input_pair.csv_path;
+	const csv_path = maybe_input_list.csv_path;
 	if (typeof csv_path !== "string") {
 		return false;
 	}
-	const output_path = maybe_input_pair.output_path;
+	const output_path = maybe_input_list.output_path;
 	if (typeof output_path !== "string") {
 		return false;
 	}
@@ -64,12 +64,12 @@ function is_config(maybe_config) {
 	if (typeof max_LD !== "number") {
 		return false;
 	}
-	const input_pairs = maybe_config.input_pairs;
-	if (!Array.isArray(input_pairs)) {
+	const input_list = maybe_config.input_list; 
+	if (!Array.isArray(input_list)) {
 		return false;
 	}
-	for (const input_pair of input_pairs) {
-		if (!is_input_pair(input_pair)) {
+	for (const input of input_list) { 
+		if (!is_input(input)) { 
 			return false;
 		}
 	}
