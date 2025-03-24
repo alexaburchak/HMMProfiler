@@ -23,28 +23,26 @@ conda install -c bioconda hmmer -y
 brew install seqkit hmmer
 ```
 
-## Pipeline 1: Identifying Functional Regions (`counts_pipeline.js`)
+## Pipeline 1: Identifying Functional Regions `counts_pipeline.js`
 
 ### How to use 
 
-1. **Prepare Configuration File (`count_parameters.json`)**
-- `input_pairs`: Array of objects containing: 
-  - `fastq_path`: Path to FASTQ file.
-  - `model_path`: Path to the HMM profile.
-- `counts_outpath`: Path to write all unique sequence combinations found in matches output and their frequency.
-- `min_quality`: Minimum quality score for FASTQ filtering.
+1. **Prepare Configuration File:** `count_parameters.json`
+  - `input_pairs`: Array of objects containing: 
+    - `fastq_path`: Path to FASTQ file.
+    - `model_path`: Path to the HMM profile.
+  - `counts_outpath`: Path to write all unique sequence combinations found in matches output and their frequency.
+  - `min_quality`: Minimum quality score for FASTQ filtering.
 
-2. **Run the Script**:
-Assuming your config file is named count_parameters.json, from the command line you can run: 
+2. **Run the Script:**
 ```bash
 node counts_pipeline.js -c count_parameters.json
 ```
 
-3. **Outputs**
-The pipeline generates a CSV file at `counts_outpath` containing:: 
-    - `{model_name}_seq`: Trimmed sequences for each model searched. Each model will have its own CSV column. 
-    - `count`: Count of occurences of each combination of sequences in matches_outpath. 
-    - `frequency`: Frequency of each sequence combination relative to all detected combinations.
+3. **Output:** `counts_outpath`
+  - `{model_name}_seq`: Trimmed sequences for each model searched. Each model will have its own CSV column. 
+  - `count`: Count of occurences of each combination of sequences in matches_outpath. 
+  - `frequency`: Frequency of each sequence combination relative to all detected combinations.
 
 ### Workflow
 
@@ -64,30 +62,28 @@ The pipeline generates a CSV file at `counts_outpath` containing::
 
 **8. Save Counts to CSV** - Outputs a count and frequency for each unique sequence combination.
 
-## Pipeline 2: Matching Query Sequences (`matches_pipeline.js`)
+## Pipeline 2: Matching Query Sequences `matches_pipeline.js`
 
 ### How to use
 
-1. **Prepare Configuration File (`match_parameters.json`)**
-- `input_list`: Array of objects containing: 
-  - `query_path`: Path to query sequence(s), can be FASTA or a raw sequence string.
-  - `model_path`: Path to the HMM profile.
-  - `csv_path`: Path to the output CSV from `counts_pipeline.js`.
-  - `output_path`: Path for saving match results.
-- `max_LD`: Maximum Levenshtein distance for matching sequences. 
+1. **Prepare Configuration File:** `match_parameters.json`
+  - `input_list`: Array of objects containing: 
+    - `query_path`: Path to query sequence(s), can be FASTA or a raw sequence string.
+    - `model_path`: Path to the HMM profile.
+    - `csv_path`: Path to the output CSV from `counts_pipeline.js`.
+    - `output_path`: Path for saving match results.
+  - `max_LD`: Maximum Levenshtein distance for matching sequences. 
 
-2. **Run the Script**:
-Assuming your config file is named count_parameters.json, from the command line you can run: 
+2. **Run the Script:**
 ```bash
 node matches_pipeline.js -c match_parameters.json
 ```
 
-3. **Outputs**
-The pipeline generates a CSV file at `output_path` containing:: 
-    - `query_sequence`: Query sequence from the input. 
-    - `levenshtein_dist`: Distance between the query and closest match.
-    - `matched_modelname`: Name of the matched functional region.
-    - Additional columns from `counts_pipeline.js` output. 
+3. **Output:** `output_path`
+  - `query_sequence`: Query sequence from the input. 
+  - `levenshtein_dist`: Distance between the query and closest match.
+  - `matched_modelname`: Name of the matched functional region.
+  - Additional columns from `counts_pipeline.js` output. 
 
 ### Workflow
 
