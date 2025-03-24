@@ -401,8 +401,8 @@ async function countSeqs(seqMap) {
 						seq,
 					]),
 				),
-				count,
-				frequency: count / totalCombinations 
+				Count: count,
+				Frequency: count / totalCombinations 
 			}));
 	} catch (error) {
 		console.error("Error processing sequence counts:", error);
@@ -463,7 +463,6 @@ async function main() {
 
 	// Split all FASTQ files
 	for (const { fastq_path, model_path } of input_pairs) {
-		console.log(`Splitting fastq files for: ${fastq_path}`);
 
 		// Extract filename without extension for unique directory
 		const fastqBaseName = path.basename(fastq_path, path.extname(fastq_path));
@@ -491,78 +490,64 @@ async function main() {
 		}
 	}
 
-    console.log("split_input_pairs:", split_input_pairs);
+	// Initialize empty map for sequences
+	/** @type {Map<string, { model: string; sequence: string }[]>} */
+	let seqMap = new Map();
 
-	try {
-		// Initialize empty map for sequences
-		/** @type {Map<string, { model: string; sequence: string }[]>} */
-		let seqMap = new Map();
+	for (const [split_fastq_path, model_path] of split_input_pairs) {
 
-		for (const [split_fastq_path, model_path] of split_input_pairs) {
-			console.log(`Processing: ${split_fastq_path} with model ${model_path}`);
+		// Extract file names
+		const fastqName = path.basename(split_fastq_path, path.extname(split_fastq_path));
+		const modelName = path.basename(model_path, path.extname(model_path));
+		console.log(`Processing: ${fastqName} with model ${modelName}`);
 
-			// Extract file names
-            const fastqName = path.basename(split_fastq_path, path.extname(split_fastq_path));
-            const modelName = path.basename(model_path, path.extname(model_path));
+		// Define intermediate file paths
+		const translatedFastaPath = path.join(mainTempDir, `${fastqName}_${modelName}_translated.fasta`);
+		const domtblPath = path.join(mainTempDir, `${fastqName}_${modelName}.domtblout`);
+		const stdoutPath = path.join(mainTempDir, `${fastqName}_${modelName}.stdout`);
+		const bedOut = path.join(mainTempDir, `${fastqName}_${modelName}_output.bed`);
+		const trimmedFasta = path.join(mainTempDir, `${fastqName}_${modelName}_trimmed.fasta`);
 
-            // Define intermediate file paths
-            const translatedFastaPath = path.join(mainTempDir, `${fastqName}_${modelName}_translated.fasta`);
-            const domtblPath = path.join(mainTempDir, `${fastqName}_${modelName}.domtblout`);
-            const stdoutPath = path.join(mainTempDir, `${fastqName}_${modelName}.stdout`);
-            const bedOut = path.join(mainTempDir, `${fastqName}_${modelName}_output.bed`);
-			const trimmedFasta = path.join(mainTempDir, `${fastqName}_${modelName}_trimmed.fasta`);
+		// Translate in all 6 reading frames
+		console.log(`Translating: ${fastqName}...`);
+		await fullSeqKit(split_fastq_path, min_quality, translatedFastaPath);
 
-			// Translate in all 6 reading frames
-			console.log(`Translating: ${split_fastq_path}...`);
-			await fullSeqKit(split_fastq_path, min_quality, translatedFastaPath);
+		// Run HMMER on all translated sequences
+		console.log(
+			`Running hmmsearch for: ${translatedFastaPath} with model ${modelName}...`,
+		);
+		await runHMMSearch(
+			model_path,
+			translatedFastaPath,
+			domtblPath,
+			stdoutPath,
+		);
 
-			// Run HMMER on all translated sequences
-			console.log(
-				`Running hmmsearch for: ${translatedFastaPath} with model ${model_path}...`,
-			);
-			await runHMMSearch(
-				model_path,
-				translatedFastaPath,
-				domtblPath,
-				stdoutPath,
-			);
+		// Generate BED file of best hits and their alignment coordinates
+		console.log(
+			`Mapping trimmed sequences to target names for: ${trimmedFasta}...`,
+		);
+		await extractBestHMMHits(domtblPath, bedOut);
 
-			// Generate BED file of best hits and their alignment coordinates
-			console.log(
-				`Mapping trimmed sequences to target names for: ${trimmedFasta}...`,
-			);
-			await extractBestHMMHits(domtblPath, bedOut);
-
-			// Trim sequences based on alignment coordinates
-			await trimSeqs(translatedFastaPath, bedOut, trimmedFasta);
-
-			seqMap = await mapFastaSeqs(trimmedFasta, modelName, fastqName, seqMap); // Update seqMap with each FASTA file
-		}
-
-		// Once all sequences have been added to seqMap, count the sequences
-		console.log("Generating count file...");
-		const seqCounts = await countSeqs(seqMap);
-
-		// Save counts as csv
-		await writeCSV(seqCounts, counts_outpath);
-		console.log(`Counts saved to: ${counts_outpath}`);
-
-		return seqCounts;
-	} catch (error) {
-		if (error instanceof Error) {
-			console.error(error.message);
-		} else {
-			console.error("Unknown error occurred.");
-		}
-		throw error;
-	} finally {
-		// Remove temporary directories and all contents
-		console.log("Cleaning up temporary files...");
-		fs.rmSync(mainTempDir, { recursive: true, force: true });
-		fs.rmSync(batchTempDir, { recursive: true, force: true });
-		console.log("Pipeline completed!");
+		// Trim sequences based on alignment coordinates
+		await trimSeqs(translatedFastaPath, bedOut, trimmedFasta);
+		seqMap = await mapFastaSeqs(trimmedFasta, modelName, fastqName, seqMap); // Update seqMap with each FASTA file
 	}
+
+	// Once all sequences have been added to seqMap, count the sequences
+	console.log("Generating count file...");
+	const seqCounts = await countSeqs(seqMap);
+	await writeCSV(seqCounts, counts_outpath);
+
+	// Remove temporary directories and all contents
+	console.log("Cleaning up temporary files...");
+	fs.rmSync(mainTempDir, { recursive: true, force: true });
+	fs.rmSync(batchTempDir, { recursive: true, force: true });
+	console.log("Pipeline completed! Counts saved to: ${counts_outpath}");
+
+	return seqCounts;
 }
+
 
 // Execute main function
 main().catch(console.error);

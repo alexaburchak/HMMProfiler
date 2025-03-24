@@ -1,7 +1,7 @@
 {
     "input_list": [
-       {"query_path": "/Users/alexaburchak/Desktop/test.fasta", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm", "csv_path": "/Users/alexaburchak/Desktop/super_cool_output/evens_ngs_hmm_counts.csv", "output_path": "/Users/alexaburchak/Desktop/matches_VH.csv"},
-       {"query_path": "/Users/alexaburchak/Desktop/test.fasta", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm", "csv_path": "/Users/alexaburchak/Desktop/super_cool_output/evens_ngs_hmm_counts.csv", "output_path": "/Users/alexaburchak/Desktop/matches_VL.csv"}
+       {"query_path": "/Users/alexaburchak/Desktop/test.fasta", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm", "csv_path": "/Users/alexaburchak/Desktop/super_cool_output/ngs_hmm_counts.csv", "output_path": "/Users/alexaburchak/Desktop/matches_VH.csv"},
+       {"query_path": "/Users/alexaburchak/Desktop/test.fasta", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm", "csv_path": "/Users/alexaburchak/Desktop/super_cool_output/ngs_hmm_counts.csv", "output_path": "/Users/alexaburchak/Desktop/matches_VL.csv"}
     ],
     "max_LD": 2
 }

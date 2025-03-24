@@ -220,24 +220,28 @@ function levenshteinDistance(a, b) {
 }
 
 /**
- * Function to read one or more CSV files and search for the closest matching protein sequences
- * @param {string} csvFile - CSV file paths
- * @param {string[]} query - Array of query sequences from FASTA file.
+ * Reads a CSV file and searches for the closest matching protein sequences
+ * @param {string} csvFile - CSV file path
+ * @param {string[]} query - Array of query sequences from FASTA file
  * @param {string} sequenceColumn - The name of the column containing protein sequences
- * @param {number} [maxLevenshteinDistance] - Optional filter on Levenshtein distance
+ * @param {number} [maxLevenshteinDistance=Infinity] - Optional filter on Levenshtein distance
  * @returns {Promise<Map<string, Array<Object>>>} - A map with the query sequence as the key and its corresponding matches as the value
  */
 async function findClosestMatches(csvFile, query, sequenceColumn, maxLevenshteinDistance = Infinity) {
-    /** @type {Array<Record<string, any>>} records - Array to hold all rows from all CSV files */
+    /** @type {Array<Record<string, string>>} */
     const records = [];
 
     return new Promise((resolve, reject) => {
         fs.createReadStream(csvFile)
             .pipe(csv())
             .on('data', (row) => {
-                if (row && typeof row === 'object' && sequenceColumn in row) {
-                    row.csvFile = csvFile; // Attach filename to each record
-                    records.push(row);
+                if (row && typeof row === 'object') {
+                    // Ensure the row contains sequenceColumn 
+                    if (sequenceColumn in row) {
+                        records.push(row);
+                    } else {
+                        console.warn(`Skipping row in ${csvFile}: Missing column "${sequenceColumn}"`);
+                    }
                 }
             })
             .on('end', () => {
@@ -245,25 +249,37 @@ async function findClosestMatches(csvFile, query, sequenceColumn, maxLevenshtein
 
                 for (const querySequence of query) {
                     console.log(`Searching for matches to query: ${querySequence}`);
-                    
+
                     let matches = records.map(row => {
-                        const levenshteinDistanceValue = levenshteinDistance(querySequence, row[sequenceColumn]);
-                        
-                        if (levenshteinDistanceValue <= maxLevenshteinDistance) {
+                        const sequence = row[sequenceColumn];
+
+                        if (!sequence) return null; // Skip empty sequences
+
+                        const dist = levenshteinDistance(querySequence, sequence);
+
+                        if (dist <= maxLevenshteinDistance) {
                             return {
-                                query_sequence: row[sequenceColumn], 
-                                levenshtein_dist: levenshteinDistanceValue,
-                                matched_modelname: sequenceColumn,
-                                ...row,
+                                Query_Seq: querySequence,
+                                Levenshtein_Dist: dist,
+                                Matched_Seq: sequence,
+                                Count: Number(row['Count']),
+                                Frequency: Number(row['Frequency'])
                             };
                         }
                         return null;
-                    }).filter(match => match !== null);
-                    
-                    matches.sort((a, b) => a.levenshtein_dist - b.levenshtein_dist);
+                    })
+                    .filter(Boolean);
+
+                    // Sort by levenshtein distance 
+                    matches.sort((a, b) => {
+                        if (a === null || b === null) {
+                            throw new Error(`Unexpected null value encountered during sorting.`);
+                        }
+                        return a.Levenshtein_Dist - b.Levenshtein_Dist;
+                    });
                     matchesMap.set(querySequence, matches);
                 }
-                
+
                 resolve(matchesMap);
             })
             .on('error', reject);
@@ -346,18 +362,16 @@ async function main () {
         }
 
         // Process raw query sequences (hmmsearch + sequence trimming)
-        console.log(`Processing ${query_path} with ${model_path}...`); 
         await runHMMSearch(model_path, queryPath, domtblPath, stdoutPath);
         await extractBestHMMHits(domtblPath, bedFilePath);
         await trimSeqs(queryPath, bedFilePath, outFastaFilePath);
 
         // Extract sequenceColumn name from model_path
-        const sequenceColumn = path.basename(model_path,  path.extname(model_path,));
+        const sequenceColumn = path.basename(model_path,  path.extname(model_path));
 
         // Generate map of closest matching protein sequences from csv files 
         const trimmedQueries = await readFastaFile(outFastaFilePath);
         const matchesMap = await findClosestMatches(csv_path, trimmedQueries, sequenceColumn, max_LD);
-        console.log("Matches:", matchesMap)
 
         // Write map to CSV
         writeCSV(matchesMap, output_path)
