@@ -3,7 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { get_config_by_path, get_config_path_by_args } from "./src/counts_config.js";
+import {
+	get_config_by_path,
+	get_config_path_by_args,
+} from "./src/counts_config.js";
 
 /**
  * Define function to batch all sequences from fastq
@@ -70,23 +73,26 @@ async function fullSeqKit(fastq_path, min_quality, fullFastaPath) {
 		// Handle process termination
 		seqkitFull.on("close", (code) => {
 			if (code === 0) {
-				
 				// After the process finishes, check if the output FASTA file is empty
-                fs.stat(fullFastaPath, (err, stats) => {
-                    if (err) {
-                        console.error(`Error checking file stats: ${err.message}`);
-                        reject(new Error(`Error checking file stats: ${err.message}`));
-                        return;
-                    }
+				fs.stat(fullFastaPath, (err, stats) => {
+					if (err) {
+						console.error(`Error checking file stats: ${err.message}`);
+						reject(new Error(`Error checking file stats: ${err.message}`));
+						return;
+					}
 
-                    if (stats.size === 0) {
-                        // If the file is empty, suggest lowering the min_quality threshold
-                        reject(new Error(`No sequences found in fasta file. Try lowering the 'min_quality' threshold!`));
-                    } else {
-						console.log(`Translated sequences saved to: ${fullFastaPath}`)
-                        resolve();
-                    }
-                });
+					if (stats.size === 0) {
+						// If the file is empty, suggest lowering the min_quality threshold
+						reject(
+							new Error(
+								`No sequences found in fasta file. Try lowering the 'min_quality' threshold!`,
+							),
+						);
+					} else {
+						console.log(`Translated sequences saved to: ${fullFastaPath}`);
+						resolve();
+					}
+				});
 			} else {
 				console.error(`Process exited with code ${code}`);
 				reject(new Error(`Process failed with exit code ${code}`));
@@ -203,17 +209,17 @@ async function extractBestHMMHits(domtblPath, bedFilePath) {
 		// Generate the BED file content
 		/** @type {string[]} bedContent - An array of strings, where each string represents a line in the BED file */
 		const bedContent = [];
-        for (const entry of bestEntries.values()) {
-            // Format the BED file line
-            const bedLine = [
-                entry.target_name, // Target name
-                entry.ali_from - 1, // Start position (BED format is 0-based)
-                entry.ali_to, // End position
-                entry.score, // Bit score
-            ].join("\t");
-            bedContent.push(bedLine);
-        } 
-        
+		for (const entry of bestEntries.values()) {
+			// Format the BED file line
+			const bedLine = [
+				entry.target_name, // Target name
+				entry.ali_from - 1, // Start position (BED format is 0-based)
+				entry.ali_to, // End position
+				entry.score, // Bit score
+			].join("\t");
+			bedContent.push(bedLine);
+		}
+
 		// Write the BED content to a file
 		fs.writeFileSync(bedFilePath, bedContent.join("\n"));
 	} catch (error) {
@@ -243,25 +249,29 @@ async function trimSeqs(inFastaFilePath, bedFilePath, outFastaFilePath) {
 
 		// Capture data from stdout stream (trimmed seqs)
 		seqkitSubseq.stdout.on("data", (data) => {
-            output += data.toString();
-        });
-        
-        seqkitSubseq.stderr.on("data", (data) => {
-            errorOutput += data.toString();
-        });
-        
-        seqkitSubseq.on("close", (code) => {
-            if (code === 0) {
-                resolve(output);
-            } else {
-                console.error(`seqkit subseq failed with exit code ${code}: ${errorOutput}`);
-                reject(new Error(`Command failed with exit code ${code}: ${errorOutput}`));
-            }
-        });
-        
-        seqkitSubseq.on("error", (err) => {
-            console.error("Failed to start seqkit process:", err.message);
-        });
+			output += data.toString();
+		});
+
+		seqkitSubseq.stderr.on("data", (data) => {
+			errorOutput += data.toString();
+		});
+
+		seqkitSubseq.on("close", (code) => {
+			if (code === 0) {
+				resolve(output);
+			} else {
+				console.error(
+					`seqkit subseq failed with exit code ${code}: ${errorOutput}`,
+				);
+				reject(
+					new Error(`Command failed with exit code ${code}: ${errorOutput}`),
+				);
+			}
+		});
+
+		seqkitSubseq.on("error", (err) => {
+			console.error("Failed to start seqkit process:", err.message);
+		});
 	});
 }
 
@@ -273,7 +283,12 @@ async function trimSeqs(inFastaFilePath, bedFilePath, outFastaFilePath) {
  * @param {Map<string, { model: string; sequence: string }[]>} seqMap - Existing map to append sequences
  * @returns {Promise<Map<string, { model: string; sequence: string }[]>>} - Updated sequence map
  */
-async function mapFastaSeqs(trimmedFastaPath, modelName, fastqName, seqMap = new Map()) {
+async function mapFastaSeqs(
+	trimmedFastaPath,
+	modelName,
+	fastqName,
+	seqMap = new Map(),
+) {
 	return new Promise((resolve, reject) => {
 		/** @type {string | null} */
 		let target_name = null;
@@ -300,8 +315,8 @@ async function mapFastaSeqs(trimmedFastaPath, modelName, fastqName, seqMap = new
 
 				// Extract target name before "_frame"
 				target_name = line.replace(/^>(.*?)_frame.*/, "$1").trim();
-                // Append the FASTQ file name to make it unique
-                target_name = `${target_name}|${fastqName}`;
+				// Append the FASTQ file name to make it unique
+				target_name = `${target_name}|${fastqName}`;
 				currentSequence = ""; // Reset sequence for new target
 			} else {
 				currentSequence += line.trim(); // Append sequence data
@@ -315,7 +330,7 @@ async function mapFastaSeqs(trimmedFastaPath, modelName, fastqName, seqMap = new
 				sequences.push({ model: modelName, sequence: currentSequence.trim() });
 				seqMap.set(target_name, sequences);
 			}
-            console.log(`Finished processing. Current seqMap size: ${seqMap.size}`);
+			console.log(`Finished processing. Current seqMap size: ${seqMap.size}`);
 			resolve(seqMap);
 		});
 
@@ -345,7 +360,7 @@ async function countSeqs(seqMap) {
 			const modelSequences = new Map();
 
 			// Track missing models for this target
-			let missingModels = new Set(allModels);
+			const missingModels = new Set(allModels);
 
 			for (const { model, sequence } of entries) {
 				// Store sequence by model
@@ -358,7 +373,7 @@ async function countSeqs(seqMap) {
 
 			// If there are any missing models for this target, skip it
 			if (missingModels.size > 0) {
-				continue; 
+				continue;
 			}
 
 			// Store valid model sequences for this target
@@ -402,7 +417,7 @@ async function countSeqs(seqMap) {
 					]),
 				),
 				Count: count,
-				Frequency: count / totalCombinations 
+				Frequency: count / totalCombinations,
 			}));
 	} catch (error) {
 		console.error("Error processing sequence counts:", error);
@@ -423,12 +438,12 @@ function writeCSV(data, outputPath) {
 
 	// Collect all unique headers across data entries
 	const allHeaders = new Set();
-    for (const row of data) {
-        for (const key of Object.keys(row)) {
-            allHeaders.add(key);
-        }
-    }
-    const headers = Array.from(allHeaders);
+	for (const row of data) {
+		for (const key of Object.keys(row)) {
+			allHeaders.add(key);
+		}
+	}
+	const headers = Array.from(allHeaders);
 
 	// Convert data to CSV format
 	const csvRows = [
@@ -463,7 +478,6 @@ async function main() {
 
 	// Split all FASTQ files
 	for (const { fastq_path, model_path } of input_pairs) {
-
 		// Extract filename without extension for unique directory
 		const fastqBaseName = path.basename(fastq_path, path.extname(fastq_path));
 		const modelName = path.basename(model_path, path.extname(model_path));
@@ -495,18 +509,35 @@ async function main() {
 	let seqMap = new Map();
 
 	for (const [split_fastq_path, model_path] of split_input_pairs) {
-
 		// Extract file names
-		const fastqName = path.basename(split_fastq_path, path.extname(split_fastq_path));
+		const fastqName = path.basename(
+			split_fastq_path,
+			path.extname(split_fastq_path),
+		);
 		const modelName = path.basename(model_path, path.extname(model_path));
 		console.log(`Processing: ${fastqName} with model ${modelName}`);
 
 		// Define intermediate file paths
-		const translatedFastaPath = path.join(mainTempDir, `${fastqName}_${modelName}_translated.fasta`);
-		const domtblPath = path.join(mainTempDir, `${fastqName}_${modelName}.domtblout`);
-		const stdoutPath = path.join(mainTempDir, `${fastqName}_${modelName}.stdout`);
-		const bedOut = path.join(mainTempDir, `${fastqName}_${modelName}_output.bed`);
-		const trimmedFasta = path.join(mainTempDir, `${fastqName}_${modelName}_trimmed.fasta`);
+		const translatedFastaPath = path.join(
+			mainTempDir,
+			`${fastqName}_${modelName}_translated.fasta`,
+		);
+		const domtblPath = path.join(
+			mainTempDir,
+			`${fastqName}_${modelName}.domtblout`,
+		);
+		const stdoutPath = path.join(
+			mainTempDir,
+			`${fastqName}_${modelName}.stdout`,
+		);
+		const bedOut = path.join(
+			mainTempDir,
+			`${fastqName}_${modelName}_output.bed`,
+		);
+		const trimmedFasta = path.join(
+			mainTempDir,
+			`${fastqName}_${modelName}_trimmed.fasta`,
+		);
 
 		// Translate in all 6 reading frames
 		console.log(`Translating: ${fastqName}...`);
@@ -516,12 +547,7 @@ async function main() {
 		console.log(
 			`Running hmmsearch for: ${translatedFastaPath} with model ${modelName}...`,
 		);
-		await runHMMSearch(
-			model_path,
-			translatedFastaPath,
-			domtblPath,
-			stdoutPath,
-		);
+		await runHMMSearch(model_path, translatedFastaPath, domtblPath, stdoutPath);
 
 		// Generate BED file of best hits and their alignment coordinates
 		console.log(
@@ -547,7 +573,6 @@ async function main() {
 
 	return seqCounts;
 }
-
 
 // Execute main function
 main().catch(console.error);

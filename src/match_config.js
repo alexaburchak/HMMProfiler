@@ -5,9 +5,9 @@ import yargs from "yargs/yargs";
  * Represents a pair of input files for the pipeline
  * @typedef {object} input_list
  * @property {string} query_path - Path to the query sequences (can be a FASTA file or a single sequence string)
- * @property {string} model_path - Path to hmm for trimming query sequences 
- * @property {string} csv_path - Path to counts csv file to be searched 
- * @property {string} output_path - Path to output csv of identified matches 
+ * @property {string} model_path - Path to hmm for trimming query sequences
+ * @property {string} csv_path - Path to counts csv file to be searched
+ * @property {string} output_path - Path to output csv of identified matches
  */
 
 /**
@@ -64,12 +64,12 @@ function is_config(maybe_config) {
 	if (typeof max_LD !== "number") {
 		return false;
 	}
-	const input_list = maybe_config.input_list; 
+	const input_list = maybe_config.input_list;
 	if (!Array.isArray(input_list)) {
 		return false;
 	}
-	for (const input of input_list) { 
-		if (!is_input(input)) { 
+	for (const input of input_list) {
+		if (!is_input(input)) {
 			return false;
 		}
 	}
