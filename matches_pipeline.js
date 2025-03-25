@@ -235,14 +235,14 @@ function levenshteinDistance(a, b) {
 /**
  * Reads a CSV file and searches for the closest matching protein sequences
  * @param {string} csvFile - CSV file path
- * @param {string[]} query - Array of query sequences from FASTA file
+ * @param {{original: string[], trimmed: string[]}} queries - Array of original and trimmed query sequences from FASTA file
  * @param {string} sequenceColumn - The name of the column containing protein sequences
  * @param {number} [maxLevenshteinDistance=Infinity] - Optional filter on Levenshtein distance
- * @returns {Promise<Map<string, Array<Object>>>} - A map with the query sequence as the key and its corresponding matches as the value
+ * @returns {Promise<Map<string, Array<Object>>>} - A map with trimmed query sequences as keys and its corresponding matches as the value
  */
 async function findClosestMatches(
 	csvFile,
-	query,
+	queries,
 	sequenceColumn,
 	maxLevenshteinDistance = Number.POSITIVE_INFINITY,
 ) {
@@ -267,7 +267,8 @@ async function findClosestMatches(
 			.on("end", () => {
 				const matchesMap = new Map();
 
-				for (const querySequence of query) {
+				for (const querySequence of queries.trimmed) {
+					const originalQuery = queries.original[queries.trimmed.indexOf(querySequence)];
 					console.log(`Searching for matches to query: ${querySequence}`);
 
 					const matches = records
@@ -282,11 +283,13 @@ async function findClosestMatches(
 
 							if (dist <= maxLevenshteinDistance) {
 								return {
-									Query_Seq: querySequence,
-									Levenshtein_Dist: dist,
+									Original_Query_Seq: originalQuery,
+									Trimmed_Query_Seq: querySequence,
 									Matched_Seq: sequence,
+									Levenshtein_Dist: dist,
 									Count: Number(row.Count),
-									Frequency: Number(row.Frequency),
+									Total_Count: Number(row.Total_Count),
+									Frequency: Number(row.Frequency)
 								};
 							}
 							return null;
@@ -376,15 +379,18 @@ async function main() {
 
 	for (const { query_path, model_path, csv_path, output_path } of input_list) {
 		let queryPath;
+		let originalQueries = []; //keep track of untrimmed query sequences 
 		if (!query_path.endsWith(".fasta")) {
 			// If the query does NOT end with .fasta, treat it as a sequence string
 			const fastaFile = path.join(__dirname, "temp_query.fasta");
 			const fastaContent = `>query\n${query_path}\n`; // Format the sequence as a FASTA entry
 			fs.writeFileSync(fastaFile, fastaContent); // Write it to a temporary FASTA file
 			queryPath = fastaFile;
+			originalQueries = [query_path]; 
 		} else {
 			// If it's already a FASTA file, pass it directly
 			queryPath = query_path;
+			originalQueries = await readFastaFile(query_path); // Read original queries from FASTA file
 		}
 
 		// Process raw query sequences (hmmsearch + sequence trimming)
@@ -395,11 +401,17 @@ async function main() {
 		// Extract sequenceColumn name from model_path
 		const sequenceColumn = path.basename(model_path, path.extname(model_path));
 
-		// Generate map of closest matching protein sequences from csv files
+		// Extract trimmed reads and assign to original queries 
 		const trimmedQueries = await readFastaFile(outFastaFilePath);
+		const queries = {
+			original: originalQueries,
+			trimmed: trimmedQueries
+		};
+
+		// Generate map of closest matching protein sequences from csv files
 		const matchesMap = await findClosestMatches(
 			csv_path,
-			trimmedQueries,
+			queries,
 			sequenceColumn,
 			max_LD,
 		);
