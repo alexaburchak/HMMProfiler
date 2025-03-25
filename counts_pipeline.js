@@ -384,7 +384,7 @@ async function countSeqs(seqMap) {
 		const allModelNames = Array.from(allModels);
 
 		const seqCounts = new Map();
-		let totalCombinations = 0; // Track total combinations for frequency calculation
+		let totalCount = 0; // Track total count for frequency calculation
 
 		// Count unique sequence combinations across all targets
 		for (const sequenceLists of targetSequences.values()) {
@@ -402,7 +402,7 @@ async function countSeqs(seqMap) {
 				}
 
 				seqCounts.get(seqKey).count++;
-				totalCombinations++;
+				totalCount += seqCounts.get(seqKey).count;
 			}
 		}
 
@@ -417,7 +417,8 @@ async function countSeqs(seqMap) {
 					]),
 				),
 				Count: count,
-				Frequency: count / totalCombinations,
+				Total_Count: totalCount, 
+				Frequency: count / totalCount 
 			}));
 	} catch (error) {
 		console.error("Error processing sequence counts:", error);
