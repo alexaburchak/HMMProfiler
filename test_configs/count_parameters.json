@@ -1,16 +1,16 @@
 {
     "input_pairs": [
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1001_BAK8A_OA--bc1001_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1001_BAK8A_OA--bc1001_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1002_BAK8A_OA--bc1002_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1002_BAK8A_OA--bc1002_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1003_BAK8A_OA--bc1003_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1003_BAK8A_OA--bc1003_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1008_BAK8A_OA--bc1008_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1008_BAK8A_OA--bc1008_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1009_BAK8A_OA--bc1009_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
-        {"fastq_path": "/Users/alexaburchak/Desktop/raw_pt_057_001/demultiplex.bc1009_BAK8A_OA--bc1009_BAK8A_OA.hifi_reads.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"}
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1001_BAK8A_OA--bc1001_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1001_BAK8A_OA--bc1001_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1002_BAK8A_OA--bc1002_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1002_BAK8A_OA--bc1002_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1003_BAK8A_OA--bc1003_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1003_BAK8A_OA--bc1003_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1008_BAK8A_OA--bc1008_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1008_BAK8A_OA--bc1008_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1009_BAK8A_OA--bc1009_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_pt_057_001/demultiplex.bc1009_BAK8A_OA--bc1009_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"}
     ],
-    "counts_outpath": "/Users/alexaburchak/Desktop/super_cool_output/ngs_hmm_counts.csv",
+    "counts_outpath": "/Users/alexaburchak/Desktop/currentHMM/325_ngs_hmm_counts.csv",
     "min_quality": 20
 }
