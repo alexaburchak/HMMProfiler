@@ -10,6 +10,48 @@ import {
 } from "./src/match_config.js";
 
 /**
+ * Define function to check column names 
+ * @param {{name: string, model_paths: string[], counts_path: string}[]} libraries
+ * @returns {Promise<boolean>} - Resolves to true if all models are found, otherwise false
+ */
+async function checkColNames(libraries) {
+	for (const library of libraries) {
+		// Open counts file and read the first line 
+		const fileStream = fs.createReadStream(library.counts_path);
+		const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
+
+		let headerLine = null;
+		for await (const line of rl) {
+			headerLine = line;
+			break; // Only read the first line (header)
+		}
+
+		// Handle empty file case
+		if (!headerLine) {
+			console.error(`Error: CSV file '${library.counts_path}' is empty.`);
+			return false;
+		}
+
+		// Extract column names from the CSV header
+		const columns = new Set(headerLine.split(",").map(col => col.trim()));
+
+		// Exclude constant columns
+		const constantColumns = new Set(["Count", "Total_Count", "Frequency"]);
+		const modelColumns = new Set([...columns].filter(col => !constantColumns.has(col)));
+
+		// Extract expected model column names from model_paths
+		const expectedColumns = new Set(library.model_paths.map(modelPath => path.basename(modelPath, path.extname(modelPath))));
+
+		// Ensure both sets match exactly
+		if (![...modelColumns].every(col => expectedColumns.has(col)) || ![...expectedColumns].every(col => modelColumns.has(col))) {
+			console.error(`Mismatch found in '${library.counts_path}'. Expected: ${[...expectedColumns]}. Found: ${[...modelColumns]}`);
+			return false;
+		}
+	}
+	return true;
+}
+
+/**
  * Define function to run hmmsearch
  * @param {string} modelPath
  * @param {string} fastaPath
@@ -132,12 +174,11 @@ async function extractBestHMMHits(domtblPath, bedFilePath) {
  * Define function to trim sequences based on coordinates from HMMER
  * @param {string} inFastaFilePath - Path to input fasta file (raw protein sequences)
  * @param {string} bedFilePath - Path to BED file with trimming coordinates from each HMMER hit
- * @param {string} outFastaFilePath
- * @returns {Promise<string>}
+ * @returns {Promise<Map<string, string>>}
  */
-async function trimSeqs(inFastaFilePath, bedFilePath, outFastaFilePath) {
+async function trimSeqs(inFastaFilePath, bedFilePath) {
 	return new Promise((resolve, reject) => {
-		const command = `seqkit subseq --bed ${bedFilePath} ${inFastaFilePath} > ${outFastaFilePath}`;
+		const command = `seqkit subseq --bed ${bedFilePath} ${inFastaFilePath}`;
 		const seqkitSubseq = spawn(command, { shell: true });
 
 		let output = "";
@@ -154,7 +195,21 @@ async function trimSeqs(inFastaFilePath, bedFilePath, outFastaFilePath) {
 
 		seqkitSubseq.on("close", (code) => {
 			if (code === 0) {
-				resolve(output);
+				const trimmedSeqMap = new Map();
+
+                // Parse the output and populate the map
+                const trimmedSeqs = output.split('\n').filter(line => line.trim() !== '');
+                for (const seq of trimmedSeqs) {
+                    const parts = seq.split('\n');
+                    const header = parts[0].replace('>', '').trim(); // Header line (model name)
+                    const sequence = parts.slice(1).join('').trim(); // Sequence part
+
+                    // Extract model name and store the sequence in the map
+                    const modelName = header.split(' ')[0]; // Assuming model name is in header
+                    trimmedSeqMap.set(modelName, sequence);
+                }
+
+                resolve(trimmedSeqMap); // Return map of model names to sequences
 			} else {
 				console.error(
 					`seqkit subseq failed with exit code ${code}: ${errorOutput}`,
@@ -368,49 +423,72 @@ async function main() {
 	}
 
 	// Extract parameters from config object
-	const { max_LD, input_list } = config;
+	const { max_LD, queryEntries, libraries, output_path } = config;
 
-	// Define temporary variables
+	// Check that all models are present as columns in counts_path
+	const modelsValid = await checkColNames(libraries);
+	if (!modelsValid) {
+		// Terminate if models do not match counts_path columns 
+		console.error(`Model names and library columns do not match. Exiting pipeline.`);
+		process.exit(1);
+	};
+
+	// Define temporary directories 
 	const mainTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "main-"));
-	const domtblPath = path.join(mainTempDir, "query_domtblout.tbl");
-	const stdoutPath = path.join(mainTempDir, "query_domstdout.txt");
-	const bedFilePath = path.join(mainTempDir, "query_output.bed");
-	const outFastaFilePath = path.join(mainTempDir, "trimmed_query_seqs.fasta");
+	const infastaTempDir = fs.mkdtempSync(path.join(mainTempDir, "query_fastas"));
+	const domtblTempDir = fs.mkdtempSync(path.join(mainTempDir, "hmmer_domtblout"));
+	const stdoutTempDir = fs.mkdtempSync(path.join(mainTempDir, "hmmer_stdout"));
+	const bedFileTempDir = fs.mkdtempSync(path.join(mainTempDir, "hmmer_bedout"));
+	const outFastaFileTempDir = fs.mkdtempSync(path.join(mainTempDir, "trimmed_query_fastas"));
 
-	for (const { query_path, model_path, csv_path, output_path } of input_list) {
-		let queryPath;
-		let originalQueries = []; //keep track of untrimmed query sequences 
-		if (!query_path.endsWith(".fasta")) {
-			// If the query does NOT end with .fasta, treat it as a sequence string
-			const fastaFile = path.join(__dirname, "temp_query.fasta");
-			const fastaContent = `>query\n${query_path}\n`; // Format the sequence as a FASTA entry
-			fs.writeFileSync(fastaFile, fastaContent); // Write it to a temporary FASTA file
-			queryPath = fastaFile;
-			originalQueries = [query_path]; 
-		} else {
-			// If it's already a FASTA file, pass it directly
-			queryPath = query_path;
-			originalQueries = await readFastaFile(query_path); // Read original queries from FASTA file
+	// Write query sequences to fasta files for processing 
+	for (const entry of queryEntries) {
+        const { name, sequences } = entry;
+        const fastaContent = `>${name}\n${sequences.join('X'.repeat(20))}\n`;
+        const fastaPath = path.join(infastaTempDir, `${name}.fasta`);
+        fs.writeFileSync(fastaPath, fastaContent);
+
+		// Initialize the inner map for this query entry
+        const queryMap = new Map();
+
+		// Loop through each model in the libraries
+        for (const library of libraries) {
+			for (const modelPath of library.model_paths) {
+				const domtblPath = (path.join(domtblTempDir,`${fastaPath}.domtbl`));
+                const stdoutPath = (path.join(stdoutTempDir,`${fastaPath}.stdout`));
+                const bedFilePath = (path.join(bedFileTempDir,`${fastaPath}.bed`));
+                const outFastaFilePath = (path.join(outFastaFileTempDir,`${fastaPath}_trimmed.fasta`));
+
+                // Process raw query sequence with HMM search and trimming
+                await runHMMSearch(modelPath, fastaPath, domtblPath, stdoutPath);
+                await extractBestHMMHits(domtblPath, bedFilePath);
+                const trimmedSeqMap = await trimSeqs(fastaPath, bedFilePath, outFastaFilePath);
+
+				// Map model to trimmed sequence for this query
+                for (const [modelName, trimmedSeq] of trimmedSeqMap) {
+                    queryMap.set(modelName, trimmedSeq); // Store trimmed sequences for this model
+                }
+			}
+		} 
+		
+		// Find closest matches for each query in queryMap
+		const queryMatches = [];
+
+		for (const [modelName, trimmedSeq] of queryMap) {
+			for (const library of libraries) {
+				const countsPath = library.counts_path;
+
+			}
 		}
+    }
+}
 
-		// Process raw query sequences (hmmsearch + sequence trimming)
-		await runHMMSearch(model_path, queryPath, domtblPath, stdoutPath);
-		await extractBestHMMHits(domtblPath, bedFilePath);
-		await trimSeqs(queryPath, bedFilePath, outFastaFilePath);
 
-		// Extract sequenceColumn name from model_path
-		const sequenceColumn = path.basename(model_path, path.extname(model_path));
 
-		// Extract trimmed reads and assign to original queries 
-		const trimmedQueries = await readFastaFile(outFastaFilePath);
-		const queries = {
-			original: originalQueries,
-			trimmed: trimmedQueries
-		};
 
 		// Generate map of closest matching protein sequences from csv files
 		const matchesMap = await findClosestMatches(
-			csv_path,
+			counts_path,
 			queries,
 			sequenceColumn,
 			max_LD,
@@ -425,7 +503,6 @@ async function main() {
 	console.log("Cleaning up temporary files...");
 	fs.rmSync(mainTempDir, { recursive: true, force: true });
 	console.log("Matching pipeline complete!");
-}
 
 // Execute main function
 main().catch(console.error);
