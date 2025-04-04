@@ -2,51 +2,13 @@ import * as node_fs from "node:fs";
 import yargs from "yargs/yargs";
 
 /**
- * Represents a pair of input files for the pipeline
- * @typedef {object} input_list
- * @property {string} query_path - Path to the query sequences (can be a FASTA file or a single sequence string)
- * @property {string} model_path - Path to hmm for trimming query sequences
- * @property {string} csv_path - Path to counts csv file to be searched
- * @property {string} output_path - Path to output csv of identified matches
+ * @typedef {object} MatchesConfig
+ * @property {{name: string, sequences: string[]}[]} queryEntries
+ * @property {number} max_LD
+ * @property {{name: string, model_paths: string[], counts_path: string}[]} libraries
+ * @property {string} output_path
  */
 
-/**
- * @typedef {object} PipelineConfig
- * @property {number} max_LD - Maximum levenshtein distance
- * @property {input_list[]} input_list - List of query sequences to process and count csv files for searching
- */
-
-/**
- * Validates whether the given input is an input_list object
- * @param {any} maybe_input_list
- * @returns {boolean}
- */
-function is_input(maybe_input_list) {
-	if (typeof maybe_input_list !== "object") {
-		return false;
-	}
-	if (maybe_input_list === null) {
-		return false;
-	}
-	const query_path = maybe_input_list.query_path;
-	if (typeof query_path !== "string") {
-		return false;
-	}
-	const model_path = maybe_input_list.model_path;
-	if (typeof model_path !== "string") {
-		return false;
-	}
-	const csv_path = maybe_input_list.csv_path;
-	if (typeof csv_path !== "string") {
-		return false;
-	}
-	const output_path = maybe_input_list.output_path;
-	if (typeof output_path !== "string") {
-		return false;
-	}
-
-	return true;
-}
 
 /**
  * Validates whether the given input is a PipelineConfig object
@@ -60,27 +22,68 @@ function is_config(maybe_config) {
 	if (maybe_config === null) {
 		return false;
 	}
+
+	// Validate queryEntries: array of objects with name (string) and sequences (array of strings)
+	if (!Array.isArray(maybe_config.queryEntries) || maybe_config.queryEntries.length === 0) {
+        return false;
+    }
+    
+    for (const entry of maybe_config.queryEntries) {
+        if (typeof entry !== "object" || entry === null) {
+            return false;
+        }
+        const { name, sequences } = entry;
+        
+        if (typeof name !== "string") {
+            return false;
+        }
+        if (!Array.isArray(sequences) || sequences.length === 0 ||
+            !sequences.every(seq => typeof seq === "string")) {
+            return false;
+        }
+    }
+	
+	// Validate libraries: array of objects with name (string), model_paths (array of strings), counts_path (string)
+	if (!Array.isArray(maybe_config.libraries) || maybe_config.libraries.length === 0) {
+        return false;
+    }
+    
+    for (const library of maybe_config.libraries) {
+        if (typeof library !== "object" || library === null) {
+            return false;
+        }
+        const { name, model_paths, counts_path } = library;
+        
+        if (typeof name !== "string") {
+            return false;
+        }
+        if (!Array.isArray(model_paths) || model_paths.length === 0 ||
+            !model_paths.every(path => typeof path === "string")) {
+            return false;
+        }
+        if (typeof counts_path !== "string") {
+            return false;
+        }
+    }
+
+	// Validate output path
+	const output_path = maybe_config.output_path;
+	if (typeof output_path !== "string") {
+		return false;
+	}
+
+	// Validate levenshtein distance filter 
 	const max_LD = maybe_config.max_LD;
 	if (typeof max_LD !== "number") {
 		return false;
 	}
-	const input_list = maybe_config.input_list;
-	if (!Array.isArray(input_list)) {
-		return false;
-	}
-	for (const input of input_list) {
-		if (!is_input(input)) {
-			return false;
-		}
-	}
-
 	return true;
 }
 
 /**
  * Reads + parses a JSON configuration file from given path
  * @param {string} config_path
- * @returns {PipelineConfig | null}
+ * @returns {MatchesConfig | null}
  */
 function get_config_by_path(config_path) {
 	const config_buffer = node_fs.readFileSync(config_path);
