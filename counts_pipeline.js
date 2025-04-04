@@ -124,8 +124,6 @@ async function fullSeqKit(fastq_path, min_quality, fullFastaPath) {
 async function runHMMSearch(modelPath, fastaPath, domtblPath, stdoutPath) {
 	return new Promise((resolve, reject) => {
 		const hmmsearch = spawn("hmmsearch", [
-			"-E",
-			"1e-5", // e-value threshold
 			"--domtblout",
 			domtblPath,
 			modelPath,
@@ -192,18 +190,21 @@ async function extractBestHMMHits(domtblPath, bedFilePath) {
 			// Extract relevant columns
 			const entry = {
 				target_name: columns[0], // Target sequence name
-				score: Number.parseFloat(columns[7]), // Bit score
+				qlen: Number.parseInt(columns[5], 10), // Model length 
+				score: Number.parseFloat(columns[13]), // Bit score for each domain 
+				hmm_from: Number.parseInt(columns[15], 10), // HMM start
+				hmm_to: Number.parseInt(columns[16], 10), // HMM end
 				ali_from: Number.parseInt(columns[17], 10), // Alignment start
 				ali_to: Number.parseInt(columns[18], 10), // Alignment end
 			};
 
-			// Group entries by target_name and store the highest-scoring hit
-			const key = entry.target_name.split("_frame=")[0]; // Strip out frame info for unique target name
-			const entryForTarget = bestEntries.get(key);
-
-			if (entryForTarget === undefined || entryForTarget.score < entry.score) {
-				bestEntries.set(key, entry); // If this is the highest score, update it
+			// Skip entries that do not cover the full length of the hmm
+			if (Math.abs(entry.hmm_from - 1) > 2 || Math.abs(entry.hmm_to - entry.qlen) > 2) {
+				continue;
 			}
+
+			// Group entries by target_name and store the highest-scoring hit
+			bestEntries.set(entry.target_name, entry); 
 		}
 
 		// Generate the BED file content
@@ -384,7 +385,7 @@ async function countSeqs(seqMap) {
 		const allModelNames = Array.from(allModels);
 
 		const seqCounts = new Map();
-		let totalCount = 0; // Track total count for frequency calculation
+		let totalCount = 0; // Initialize total count
 
 		// Count unique sequence combinations across all targets
 		for (const sequenceLists of targetSequences.values()) {
@@ -402,9 +403,10 @@ async function countSeqs(seqMap) {
 				}
 
 				seqCounts.get(seqKey).count++;
-				totalCount += seqCounts.get(seqKey).count;
 			}
 		}
+
+		totalCount = Array.from(seqCounts.values()).reduce((sum, entry) => sum + entry.count, 0);
 
 		// Convert results to sorted array
 		return Array.from(seqCounts.values())
@@ -567,10 +569,10 @@ async function main() {
 	await writeCSV(seqCounts, counts_outpath);
 
 	// Remove temporary directories and all contents
-	console.log("Cleaning up temporary files...");
-	fs.rmSync(mainTempDir, { recursive: true, force: true });
-	fs.rmSync(batchTempDir, { recursive: true, force: true });
-	console.log("Pipeline completed! Counts saved to: ${counts_outpath}");
+	// console.log("Cleaning up temporary files...");
+	// fs.rmSync(mainTempDir, { recursive: true, force: true });
+	// fs.rmSync(batchTempDir, { recursive: true, force: true });
+	console.log(`Pipeline completed! Counts saved to: ${counts_outpath}`);
 
 	return seqCounts;
 }
