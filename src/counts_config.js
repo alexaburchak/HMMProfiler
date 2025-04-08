@@ -12,6 +12,7 @@ import yargs from "yargs/yargs";
  * @typedef {object} PipelineConfig
  * @property {string} counts_outpath - Path for counts output file
  * @property {number} min_quality - Minimum quality threshold for filtering reads
+ * @property {number} hmm_coverage - Minimum required model coverage for hmmsearch hits
  * @property {InputPair[]} input_pairs - List of FASTQ and model file pairs to process
  */
 
@@ -53,6 +54,10 @@ function is_config(maybe_config) {
 	}
 	const min_quality = maybe_config.min_quality;
 	if (typeof min_quality !== "number") {
+		return false;
+	}
+	const hmm_coverage = maybe_config.hmm_coverage;
+	if (typeof hmm_coverage !== "number") {
 		return false;
 	}
 	const counts_outpath = maybe_config.counts_outpath;

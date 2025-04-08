@@ -159,10 +159,11 @@ async function runHMMSearch(modelPath, fastaPath, domtblPath, stdoutPath) {
 /**
  * Define function to parse full hmmsearch output, determine best hit per target and generate a BED file
  * @param {string} domtblPath - Path to the hmmsearch domtblout file
+ * @param {number} coverage - Minimum required HMM coverage
  * @param {string} bedFilePath - Path to output the BED file
  * @returns {Promise<void>}
  */
-async function extractBestHMMHits(domtblPath, bedFilePath) {
+async function extractBestHMMHits(domtblPath, coverage, bedFilePath) {
 	try {
 		// Create readable stream for hmmer output
 		const fileStream = fs.createReadStream(domtblPath, "utf8");
@@ -190,21 +191,22 @@ async function extractBestHMMHits(domtblPath, bedFilePath) {
 			// Extract relevant columns
 			const entry = {
 				target_name: columns[0], // Target sequence name
-				qlen: Number.parseInt(columns[5], 10), // Model length 
-				score: Number.parseFloat(columns[13]), // Bit score for each domain 
+				qlen: Number.parseInt(columns[5], 10), // Model length
+				score: Number.parseFloat(columns[13]), // Bit score for each domain
 				hmm_from: Number.parseInt(columns[15], 10), // HMM start
 				hmm_to: Number.parseInt(columns[16], 10), // HMM end
 				ali_from: Number.parseInt(columns[17], 10), // Alignment start
 				ali_to: Number.parseInt(columns[18], 10), // Alignment end
 			};
 
-			// Skip entries that do not cover the full length of the hmm
-			if (Math.abs(entry.hmm_from - 1) > 2 || Math.abs(entry.hmm_to - entry.qlen) > 2) {
+			// Skip entries that do not cover at least X% of the hmm
+			const hmm_covered = entry.hmm_to - entry.hmm_from + 1;
+			if (hmm_covered / entry.qlen < coverage) {
 				continue;
 			}
 
 			// Group entries by target_name and store the highest-scoring hit
-			bestEntries.set(entry.target_name, entry); 
+			bestEntries.set(entry.target_name, entry);
 		}
 
 		// Generate the BED file content
@@ -406,7 +408,10 @@ async function countSeqs(seqMap) {
 			}
 		}
 
-		totalCount = Array.from(seqCounts.values()).reduce((sum, entry) => sum + entry.count, 0);
+		totalCount = Array.from(seqCounts.values()).reduce(
+			(sum, entry) => sum + entry.count,
+			0,
+		);
 
 		// Convert results to sorted array
 		return Array.from(seqCounts.values())
@@ -419,8 +424,8 @@ async function countSeqs(seqMap) {
 					]),
 				),
 				Count: count,
-				Total_Count: totalCount, 
-				Frequency: count / totalCount 
+				Total_Count: totalCount,
+				Frequency: count / totalCount,
 			}));
 	} catch (error) {
 		console.error("Error processing sequence counts:", error);
@@ -470,7 +475,7 @@ async function main() {
 	}
 
 	// Extract parameters from config object
-	const { counts_outpath, min_quality, input_pairs } = config;
+	const { counts_outpath, min_quality, hmm_coverage, input_pairs } = config;
 
 	// Create temporary directory to store intermediate output
 	const mainTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "main-"));
@@ -556,7 +561,7 @@ async function main() {
 		console.log(
 			`Mapping trimmed sequences to target names for: ${trimmedFasta}...`,
 		);
-		await extractBestHMMHits(domtblPath, bedOut);
+		await extractBestHMMHits(domtblPath, hmm_coverage, bedOut);
 
 		// Trim sequences based on alignment coordinates
 		await trimSeqs(translatedFastaPath, bedOut, trimmedFasta);
@@ -569,9 +574,9 @@ async function main() {
 	await writeCSV(seqCounts, counts_outpath);
 
 	// Remove temporary directories and all contents
-	// console.log("Cleaning up temporary files...");
-	// fs.rmSync(mainTempDir, { recursive: true, force: true });
-	// fs.rmSync(batchTempDir, { recursive: true, force: true });
+	console.log("Cleaning up temporary files...");
+	fs.rmSync(mainTempDir, { recursive: true, force: true });
+	fs.rmSync(batchTempDir, { recursive: true, force: true });
 	console.log(`Pipeline completed! Counts saved to: ${counts_outpath}`);
 
 	return seqCounts;
