@@ -33,6 +33,7 @@ brew install seqkit hmmer
     - `model_path`: Path to the HMM profile.
   - `counts_outpath`: Path to write all unique sequence combinations found in matches output and their frequency.
   - `min_quality`: Minimum quality score for FASTQ filtering.
+  - `hmm_coverage`: Minimum required model coverage for hmmsearch hits.
 
 2. **Run the Script:**
 ```bash
@@ -41,8 +42,9 @@ node counts_pipeline.js -c count_parameters.json
 
 3. **Output:** `counts_outpath`
   - `{model_name}_seq`: Trimmed sequences for each model searched. Each model will have its own CSV column. 
-  - `count`: Count of occurences of each combination of sequences in matches_outpath. 
-  - `frequency`: Frequency of each sequence combination relative to all detected combinations.
+  - `Count`: Count of occurences of each combination of sequences. 
+  - `Total_Count`: Count of occurences of all possible sequence combinations (sum of `Count` column). 
+  - `Frequency`: Frequency of each sequence combination relative to all detected combinations.
 
 ### Workflow
 
@@ -67,11 +69,14 @@ node counts_pipeline.js -c count_parameters.json
 ### How to use
 
 1. **Prepare Configuration File:** `match_parameters.json`
-  - `input_list`: Array of objects containing: 
-    - `query_path`: Path to query sequence(s), can be FASTA or a raw sequence string.
-    - `model_path`: Path to the HMM profile.
-    - `csv_path`: Path to the output CSV from `counts_pipeline.js`.
-    - `output_path`: Path for saving match results.
+  - `queryEntries`: Array of query objects containing:
+    - `name`: Query name.
+    - `sequences`: Array of sequence strings. 
+  - `libraries`: Array of objects containing: 
+    - `name`: Name of library.
+    - `model_paths`: Array of paths to HMM profiles.
+    - `counts_path`: Path to the output CSV from `counts_pipeline.js`
+  - `output_path`: Path to write CSV output of all detected matches. 
   - `max_LD`: Maximum Levenshtein distance for matching sequences. 
 
 2. **Run the Script:**
@@ -103,5 +108,3 @@ node matches_pipeline.js -c match_parameters.json
 - Ensure that model names contain information about the type of structure (e.g., CDR, VH/VL) for accurate sequence pairing. This information will be extracted and used to name the sequence columns in `counts_outpath`. 
 
 - Temporary files generated during processing are automatically cleaned up.
-
-- The matching pipeline allows direct input of raw sequences if a FASTA file is not provided.
