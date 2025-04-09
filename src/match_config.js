@@ -3,12 +3,11 @@ import yargs from "yargs/yargs";
 
 /**
  * @typedef {object} MatchesConfig
- * @property {{name: string, sequences: string[]}[]} queryEntries
- * @property {number} max_LD
- * @property {{name: string, model_paths: string[], counts_path: string}[]} libraries
- * @property {string} output_path
+ * @property {{name: string, sequences: string[]}[]} queryEntries - Array of query objects with names (string) and sequences (array of strings).
+ * @property {number} max_LD - Maximum Levenshtein distance for matching sequences.
+ * @property {{name: string, model_paths: string[], counts_path: string}[]} libraries -  Array of objects with library name (string), model_paths (array of strings), and counts_path (string).
+ * @property {string} output_path - Path to write CSV output of all detected matches.
  */
-
 
 /**
  * Validates whether the given input is a PipelineConfig object
@@ -23,48 +22,60 @@ function is_config(maybe_config) {
 		return false;
 	}
 
-	// Validate queryEntries: array of objects with name (string) and sequences (array of strings)
-	if (!Array.isArray(maybe_config.queryEntries) || maybe_config.queryEntries.length === 0) {
-        return false;
-    }
-    
-    for (const entry of maybe_config.queryEntries) {
-        if (typeof entry !== "object" || entry === null) {
-            return false;
-        }
-        const { name, sequences } = entry;
-        
-        if (typeof name !== "string") {
-            return false;
-        }
-        if (!Array.isArray(sequences) || sequences.length === 0 ||
-            !sequences.every(seq => typeof seq === "string")) {
-            return false;
-        }
-    }
-	
-	// Validate libraries: array of objects with name (string), model_paths (array of strings), counts_path (string)
-	if (!Array.isArray(maybe_config.libraries) || maybe_config.libraries.length === 0) {
-        return false;
-    }
-    
-    for (const library of maybe_config.libraries) {
-        if (typeof library !== "object" || library === null) {
-            return false;
-        }
-        const { name, model_paths, counts_path } = library;
-        
-        if (typeof name !== "string") {
-            return false;
-        }
-        if (!Array.isArray(model_paths) || model_paths.length === 0 ||
-            !model_paths.every(path => typeof path === "string")) {
-            return false;
-        }
-        if (typeof counts_path !== "string") {
-            return false;
-        }
-    }
+	// Validate queryEntries
+	if (
+		!Array.isArray(maybe_config.queryEntries) ||
+		maybe_config.queryEntries.length === 0
+	) {
+		return false;
+	}
+
+	for (const entry of maybe_config.queryEntries) {
+		if (typeof entry !== "object" || entry === null) {
+			return false;
+		}
+		const { name, sequences } = entry;
+
+		if (typeof name !== "string") {
+			return false;
+		}
+		if (
+			!Array.isArray(sequences) ||
+			sequences.length === 0 ||
+			!sequences.every((seq) => typeof seq === "string")
+		) {
+			return false;
+		}
+	}
+
+	// Validate libraries
+	if (
+		!Array.isArray(maybe_config.libraries) ||
+		maybe_config.libraries.length === 0
+	) {
+		return false;
+	}
+
+	for (const library of maybe_config.libraries) {
+		if (typeof library !== "object" || library === null) {
+			return false;
+		}
+		const { name, model_paths, counts_path } = library;
+
+		if (typeof name !== "string") {
+			return false;
+		}
+		if (
+			!Array.isArray(model_paths) ||
+			model_paths.length === 0 ||
+			!model_paths.every((path) => typeof path === "string")
+		) {
+			return false;
+		}
+		if (typeof counts_path !== "string") {
+			return false;
+		}
+	}
 
 	// Validate output path
 	const output_path = maybe_config.output_path;
@@ -72,7 +83,7 @@ function is_config(maybe_config) {
 		return false;
 	}
 
-	// Validate levenshtein distance filter 
+	// Validate levenshtein distance filter
 	const max_LD = maybe_config.max_LD;
 	if (typeof max_LD !== "number") {
 		return false;
