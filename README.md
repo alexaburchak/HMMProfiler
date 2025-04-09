@@ -85,9 +85,10 @@ node matches_pipeline.js -c match_parameters.json
 ```
 
 3. **Output:** `output_path`
-  - `query_sequence`: Query sequence from the input. 
-  - `levenshtein_dist`: Distance between the query and closest match.
-  - `matched_modelname`: Name of the matched functional region.
+  - `Query`: Query name from input. 
+  - `{modelName}_Match`: Sequence from `counts_path` matched to the query sequence.
+  - `{modelName}_LD`: Distance between the query sequence and closest match.
+  - `Library`: Name of the counts library being matched. 
   - Additional columns from `counts_pipeline.js` output. 
 
 ### Workflow
@@ -100,7 +101,7 @@ node matches_pipeline.js -c match_parameters.json
 
 **4. Trim Sequences** - Extracts relevant portions of query sequences.
 
-**5. Find Closest Matches** - Compares query sequences to known functional regions using Levenshtein distance.
+**5. Find Closest Matches** - Compares query sequences to identified functional regions using Levenshtein distance.
 
 **6. Save Matches to CSV** - Outputs the closest matches for each query sequence.
 
