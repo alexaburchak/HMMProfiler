@@ -42,8 +42,8 @@ node counts_pipeline.js -c count_parameters.json
 
 3. **Output:** `counts_outpath`
   - `{model_name}_seq`: Trimmed sequences for each model searched. Each model will have its own CSV column. 
-  - `Count`: Count of occurences of each combination of sequences. 
-  - `Total_Count`: Count of occurences of all possible sequence combinations (sum of `Count` column). 
+  - `Count`: Count of occurrences of each combination of sequences. 
+  - `Total_Count`: Count of occurrences of all possible sequence combinations (sum of `Count` column). 
   - `Frequency`: Frequency of each sequence combination relative to all detected combinations.
 
 ### Workflow
