@@ -429,7 +429,7 @@ async function findClosestMatches(
 
 					// Accumulate matches for each queryName
 					const existingMatches = finalMap.get(queryName) || [];
-					finalMap.set(queryName, [...existingMatches, ...matches]);
+					finalMap.set(queryName, /** @type {Object[]} */([...existingMatches, ...matches]));
 				}
 				resolve();
 			})
