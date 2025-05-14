@@ -1,8 +1,9 @@
 {
     "input_pairs": [
-        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/raw_data/pt_057_001/demultiplex.bc1008_BAK8A_OA--bc1008_BAK8A_OA.hifi_reads.fastq.gz", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"}
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/sample_in_and_out/big.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm"},
+        {"fastq_path": "/Users/alexaburchak/Desktop/currentHMM/sample_in_and_out/big.fastq", "model_path": "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"}
     ],
-    "counts_outpath": "/Users/alexaburchak/Desktop/currentHMM/sample_in_and_out/44_VHonly_150score_1Lib_counts.csv",
+    "counts_outpath": "/Users/alexaburchak/Desktop/513_VHVL_lg_counts.csv",
     "min_quality": 20,
-    "hmm_coverage": 0.95
+    "hmm_coverage": 0.98
 }
