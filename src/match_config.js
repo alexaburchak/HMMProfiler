@@ -5,6 +5,7 @@ import yargs from "yargs/yargs";
  * @typedef {object} MatchesConfig
  * @property {{name: string, sequences: string[]}[]} queryEntries - Array of query objects with names (string) and sequences (array of strings).
  * @property {number} max_LD - Maximum Levenshtein distance for matching sequences.
+ * @property {number} hmm_coverage - Minimum required model coverage for hmmsearch hits.
  * @property {{name: string, model_paths: string[], counts_path: string}[]} libraries -  Array of objects with library name (string), model_paths (array of strings), and counts_path (string).
  * @property {string} output_path - Path to write CSV output of all detected matches.
  */
@@ -86,6 +87,12 @@ function is_config(maybe_config) {
 	// Validate levenshtein distance filter
 	const max_LD = maybe_config.max_LD;
 	if (typeof max_LD !== "number") {
+		return false;
+	}
+
+	// Validate hmm coverage filter 
+	const hmm_coverage = maybe_config.hmm_coverage;
+	if (typeof hmm_coverage !== "number") {
 		return false;
 	}
 	return true;
