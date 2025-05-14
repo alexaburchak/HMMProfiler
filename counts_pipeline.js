@@ -206,7 +206,10 @@ async function extractBestHMMHits(domtblPath, coverage, bedFilePath) {
 			}
 
 			// Group entries by target_name and store the highest-scoring hit
-			bestEntries.set(entry.target_name, entry);
+			const existing = bestEntries.get(entry.target_name);
+			if (!existing || entry.score > existing.score) {
+				bestEntries.set(entry.target_name, entry);
+			}
 		}
 
 		// Generate the BED file content

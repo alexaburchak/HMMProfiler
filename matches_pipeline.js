@@ -113,10 +113,11 @@ async function runHMMSearch(modelPath, fastaPath, domtblPath, stdoutPath) {
 /**
  * Define function to parse full hmmsearch output, determine best hit per target and generate a BED file
  * @param {string} domtblPath - Path to the hmmsearch domtblout file
+ * @param {number} coverage - Minimum required HMM coverage
  * @param {string} bedFilePath - Path to output the BED file
  * @returns {Promise<void>}
  */
-async function extractBestHMMHits(domtblPath, bedFilePath) {
+async function extractBestHMMHits(domtblPath, coverage, bedFilePath) {
 	try {
 		// Create readable stream for hmmer output
 		const fileStream = fs.createReadStream(domtblPath, "utf8");
@@ -144,17 +145,24 @@ async function extractBestHMMHits(domtblPath, bedFilePath) {
 			// Extract relevant columns
 			const entry = {
 				target_name: columns[0], // Target sequence name
-				score: Number.parseFloat(columns[7]), // Bit score
+				qlen: Number.parseInt(columns[5], 10), // Model length
+				score: Number.parseFloat(columns[13]), // Bit score for each domain
+				hmm_from: Number.parseInt(columns[15], 10), // HMM start
+				hmm_to: Number.parseInt(columns[16], 10), // HMM end
 				ali_from: Number.parseInt(columns[17], 10), // Alignment start
 				ali_to: Number.parseInt(columns[18], 10), // Alignment end
 			};
 
-			// Group entries by target_name and store the highest-scoring hit
-			const key = entry.target_name.split("_frame=")[0]; // Strip out frame info for unique target name
-			const entryForTarget = bestEntries.get(key);
+			// Skip entries that do not cover at least X% of the hmm
+			const hmm_covered = entry.hmm_to - entry.hmm_from + 1;
+			if (hmm_covered / entry.qlen < coverage) {
+				continue;
+			}
 
-			if (entryForTarget === undefined || entryForTarget.score < entry.score) {
-				bestEntries.set(key, entry); // If this is the highest score, update it
+			// Group entries by target_name and store the highest-scoring hit
+			const existing = bestEntries.get(entry.target_name);
+			if (!existing || entry.score > existing.score) {
+				bestEntries.set(entry.target_name, entry);
 			}
 		}
 
@@ -267,9 +275,10 @@ async function trimSeqs(inFastaFilePath, bedFilePath, newHeader) {
  * Define function to process query sequences (hmmer, score filtering, trimming) into a map
  * @param {Array<{name: string, sequences: string[]}>} queryEntries - Array of query entries.
  * @param {Array<{name: string, model_paths: string[], counts_path: string}>} libraries - Array of libraries.
+ * @param {number} coverage - Filter for model coverage.
  * @returns {Promise<Map<string, string>>} A promise that resolves to a Map where keys are a combination of query name and model name and values are the corresponding trimmed sequences.
  */
-async function createQueryMap(queryEntries, libraries) {
+async function createQueryMap(queryEntries, libraries, coverage) {
 	// Define temporary directories
 	const mainTempDir = fs.mkdtempSync(path.join(os.tmpdir(), "main-"));
 	const infastaTempDir = path.join(mainTempDir, "query_fastas");
@@ -303,7 +312,7 @@ async function createQueryMap(queryEntries, libraries) {
 
 				// Process raw query sequence with HMM search and trimming
 				await runHMMSearch(modelPath, fastaPath, domtblPath, stdoutPath);
-				await extractBestHMMHits(domtblPath, bedFilePath);
+				await extractBestHMMHits(domtblPath, coverage, bedFilePath);
 
 				// Trim sequences and store results in the Map
 				const trimmedSequencesMap = await trimSeqs(
@@ -491,7 +500,7 @@ async function main() {
 	}
 
 	// Extract parameters from config object
-	const { max_LD, queryEntries, libraries, output_path } = config;
+	const { max_LD, hmm_coverage, queryEntries, libraries, output_path } = config;
 
 	// Check that all models are present as columns in counts_path
 	const modelsValid = await checkColNames(libraries);
@@ -504,7 +513,7 @@ async function main() {
 	}
 
 	// Process query sequences into a map
-	const allTrimmedSequences = await createQueryMap(queryEntries, libraries);
+	const allTrimmedSequences = await createQueryMap(queryEntries, libraries, hmm_coverage);
 
 	// Group sequences by queryName
 	const groupedQueries = new Map();
