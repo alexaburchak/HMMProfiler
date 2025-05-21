@@ -41,6 +41,19 @@ conda install -c bioconda hmmer=3.4 -y
 brew install seqkit hmmer
 ```
 
+## Building a Custom Hidden Markov Model with HMMER
+Some example HMM profiles are provided under `models/AA`, but you can also generate your own HMM using [HMMER](http://eddylab.org/software/hmmer/Userguide.pdf):
+
+1. **Prepare your aligned FASTA file(`.sto`, `.fa`, `.fasta`):**
+- I used the [MSA](https://www.bioconductor.org/packages/release/bioc/html/msa.html) package in R (V1.40.0), but you can also use a multiple sequence alignment tool like [Clustal Omega](http://www.clustal.org/omega/). 
+
+2. **Build the HMM profile:**
+```bash
+hmmbuild your_model.hmm your_alignment.fa
+```
+The resulting `.hmm` file can be referenced in your configuration file under `model_path`.
+
+
 ## Pipeline 1: Identifying and Quantifying Functional Regions `counts_pipeline.js`
 
 ### How to use 
