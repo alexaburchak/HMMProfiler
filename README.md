@@ -3,6 +3,24 @@
 ## Overview
 This repository contains two main pipelines for processing next-generation sequencing (FASTQ) data to identify and quantify functional regions of interest. The first pipeline (counts_pipeline.js) processes raw sequencing data, translates nucleotide sequences, and counts unique sequence combinations. The second pipeline (matches_pipeline.js) takes the output from the first pipeline and matches query sequences against identified functional regions to find the closest matches. These pipelines provide an end-to-end solution for processing NGS data, identifying functional regions, and matching them against query sequences.
 
+## Getting Started
+1. **Clone the Repository:**
+```bash
+git clone https://github.com/alexaburchak/HMMProfiler.git
+cd HMMProfiler
+```
+
+2. **Install Node.js Dependencies:**
+Make sure you have Node.js installed (can be downloaded [here](https://nodejs.org/en/download)), then run:
+```bash
+npm install
+```
+This will install all required packages listed in `package.json`.
+
+3. **Linter and Config Files:**
+- This project uses a linter configured via `biome.json` to ensure consistent code style.
+- Configuration files (`count_parameters.json`, `matches_parameters.json`) are provided as templates under `test_configs`—please edit them to suit your data and environment.
+
 ## Install System Dependencies
 Both pipelines require several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
 
@@ -37,7 +55,7 @@ brew install seqkit hmmer
 
 2. **Run the Script:**
 ```bash
-node counts_pipeline.js -c count_parameters.json
+node counts_pipeline.js -c test_configs/count_parameters.json
 ```
 
 3. **Output:** `counts_outpath`
@@ -81,7 +99,7 @@ node counts_pipeline.js -c count_parameters.json
 
 2. **Run the Script:**
 ```bash
-node matches_pipeline.js -c matches_parameters.json
+node matches_pipeline.js -c test_configs/matches_parameters.json
 ```
 
 3. **Output:** `output_path`
