@@ -1,7 +1,7 @@
-# Pipeline for Identifying Functional Regions and Matching Sequences in Antibodies from NGS Data
+# HMMProfiler: A Duo of Pipelines for Identifying Functional Regions and Matching Sequences from NGS Data
 
 ## Overview
-This repository contains two main pipelines for processing next-generation sequencing (FASTQ) data to identify and quantify functional regions in antibodies. The first pipeline (counts_pipeline.js) processes raw sequencing data, translates nucleotide sequences, and counts unique sequence combinations. The second pipeline (matches_pipeline.js) takes the output from the first pipeline and matches query sequences against identified functional regions to find the closest matches. These pipelines provide an end-to-end solution for processing NGS data, identifying functional antibody regions, and matching them against query sequences.
+This repository contains two main pipelines for processing next-generation sequencing (FASTQ) data to identify and quantify functional regions of interest. The first pipeline (counts_pipeline.js) processes raw sequencing data, translates nucleotide sequences, and counts unique sequence combinations. The second pipeline (matches_pipeline.js) takes the output from the first pipeline and matches query sequences against identified functional regions to find the closest matches. These pipelines provide an end-to-end solution for processing NGS data, identifying functional regions, and matching them against query sequences.
 
 ## Install System Dependencies
 Both pipelines require several tools and dependencies to be installed before execution. You can use one of the following installation methods: 
@@ -13,17 +13,17 @@ conda create -n ngs_env python==3.11.7
 conda acitvate ngs_env
 
 # Install dependencies 
-conda install -c bioconda seqkit -y
+conda install -c bioconda seqkit=2.9.0 -y
 conda install -c conda-forge libcxx=16 -y
-conda install -c bioconda hmmer -y
+conda install -c bioconda hmmer=3.4 -y
 ```
 
-### Option 2: Using Homebrew (MacOS/Linux)
+### Option 2: Using Homebrew (MacOS)
 ```bash
 brew install seqkit hmmer
 ```
 
-## Pipeline 1: Identifying Functional Regions `counts_pipeline.js`
+## Pipeline 1: Identifying and Quantifying Functional Regions `counts_pipeline.js`
 
 ### How to use 
 
@@ -48,7 +48,7 @@ node counts_pipeline.js -c count_parameters.json
 
 ### Workflow
 
-**1. Set Parameters** - Reads the config file and defines output paths.
+**1. Load Configuration** - Reads the config file and defines output paths.
 
 **2. Quality Filtering and Translation** - Filters sequences, translates them into amino acid sequences, and saves results in FASTA format.
 
@@ -68,10 +68,10 @@ node counts_pipeline.js -c count_parameters.json
 
 ### How to use
 
-1. **Prepare Configuration File:** `match_parameters.json`
+1. **Prepare Configuration File:** `matches_parameters.json`
   - `queryEntries`: Array of query objects containing:
     - `name`: Query name.
-    - `sequences`: Array of sequence strings. 
+    - `sequences`: Array of amino acid strings. 
   - `libraries`: Array of objects containing: 
     - `name`: Name of library.
     - `model_paths`: Array of paths to HMM profiles.
@@ -81,7 +81,7 @@ node counts_pipeline.js -c count_parameters.json
 
 2. **Run the Script:**
 ```bash
-node matches_pipeline.js -c match_parameters.json
+node matches_pipeline.js -c matches_parameters.json
 ```
 
 3. **Output:** `output_path`
@@ -95,15 +95,17 @@ node matches_pipeline.js -c match_parameters.json
 
 **1. Load Configuration** - Reads input parameters from match_parameters.json.
 
-**2. Run HMMER on Query Sequences** - Searches for query sequences against the specified HMM model.
+**2. Validate Headers** - Confirm that `counts_path` column names match the provided model names.
 
-**3. Extract Best Hits** - Identifies the best-matching functional region.
+**3. Run HMMER on Query Sequences** - Searches for query sequences against the specified HMM model.
 
-**4. Trim Sequences** - Extracts relevant portions of query sequences.
+**4. Extract Best Hits** - Identifies the best-matching functional region.
 
-**5. Find Closest Matches** - Compares query sequences to identified functional regions using Levenshtein distance.
+**5. Trim Sequences** - Extracts relevant portions of query sequences.
 
-**6. Save Matches to CSV** - Outputs the closest matches for each query sequence.
+**6. Find Closest Matches** - Compares query sequences to identified functional regions using Levenshtein distance.
+
+**7. Save Matches to CSV** - Outputs the closest matches for each query sequence.
 
 ## Notes
 - Ensure that model names contain information about the type of structure (e.g., CDR, VH/VL) for accurate sequence pairing. This information will be extracted and used to name the sequence columns in `counts_outpath`. 
