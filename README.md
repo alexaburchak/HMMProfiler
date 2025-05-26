@@ -72,6 +72,8 @@ The resulting `.hmm` file can be referenced in your configuration file under `mo
 You can test the counts pipeline by running:
 ```bash
 cd HMMProfiler
+
+# You will need to change "USERNAME" to your own username in counts_parameters.json
 node counts_pipeline.js -c test_configs/count_parameters.json
 ```
 
@@ -118,6 +120,8 @@ node counts_pipeline.js -c test_configs/count_parameters.json
 You can test the matching pipeline by running:
 ```bash
 cd HMMProfiler
+
+# You will need to change "USERNAME" to your own username in matches_parameters.json
 node matches_pipeline.js -c test_configs/matches_parameters.json
 ```
 

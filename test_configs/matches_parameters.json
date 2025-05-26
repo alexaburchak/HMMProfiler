@@ -1,25 +1,19 @@
 {
     "queryEntries": [
-        {"name": "query1", "sequences": [
-            "QVQLVQSGAEVKKPGSSVKVSCKASGGTFHSSAIGWVRQAPGQGLEWMGHIGPIDGTAYYAQKFQGRVTITADESTSTAYMELSSLRSEDTAVYYCARRGSHDHYGIDYWGQGTLVTVSS",
-            "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYGSYPPTFGQGTKLEIK"
-        ]}
+        {"name": "Identical_Seq", "sequences": 
+        ["QVQLVQSGAEVKKPGSSVKVSCKASGGTFHSSAIGWVRQAPGQGLEWMGHIGPIDGTAYYAQKFQGRVTITADESTSTAYMELSSLRSEDTAVYYCARRGSHDHYGIDYWGQGTLVTVSS",
+        "DIQMTQSPSSLSASVGDRVTITCRASQSISSYLNWYQQKPGKAPKLLIYAASSLQSGVPSRFSGSGSGTDFTLTISSLQPEDFATYYCQQYGSYPPTFGQGTKLEIK"]}
     ],
     "max_LD": 5,
     "hmm_coverage": 0.98,
     "libraries": [
-        {"name": "NGS_Lib_Odds", 
-        "model_paths": [
-            "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm",
-            "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"
-        ], 
-            "counts_path": "/Users/alexaburchak/Desktop/currentHMM/sample_in_and_out/49_VHVL_oddLibs_counts.csv"},
-        {"name": "NGS_Lib_Evens", 
-        "model_paths": [
-            "/Users/alexaburchak/Desktop/currentHMM/models/AA/VH-prot-mod.hmm",
-            "/Users/alexaburchak/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm"
-        ], 
-        "counts_path": "/Users/alexaburchak/Desktop/currentHMM/sample_in_and_out/49_VHVL_evenLibs_counts.csv"}
+        {"name": "Sample_Library", 
+        "model_paths": ["/Users/USERNAME/Desktop/currentHMM/models/AA/VH-prot-mod.hmm",
+                        "/Users/USERNAME/Desktop/currentHMM/models/AA/VL-k-prot-mod.hmm" ], 
+        "counts_path": "/Users/USERNAME/Desktop/currentHMM/sample_counts.csv"}
     ],
-    "output_path": "/Users/alexaburchak/Desktop/424_matches_from_server.csv"
+    "output_path": "/Users/USERNAME/Desktop/currentHMM/sample_matches.csv"
 }
+
+
+
