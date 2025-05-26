@@ -1,7 +1,9 @@
 # HMMProfiler: A Duo of Pipelines for Identifying Functional Regions and Matching Sequences from NGS Data
 
 ## Overview
-This repository contains two main pipelines for processing next-generation sequencing (FASTQ) data to identify and quantify functional regions of interest. The first pipeline (counts_pipeline.js) processes raw sequencing data, translates nucleotide sequences, and counts unique sequence combinations. The second pipeline (matches_pipeline.js) takes the output from the first pipeline and matches query sequences against identified functional regions to find the closest matches. These pipelines provide an end-to-end solution for processing NGS data, identifying functional regions, and matching them against query sequences.
+This repository contains two main pipelines for processing next-generation sequencing (FASTQ) data to identify and quantify functional regions of interest. The first pipeline (counts_pipeline.js) processes raw sequencing data, translates nucleotide sequences, and counts unique sequence combinations. The second pipeline (matches_pipeline.js) takes the output from the first pipeline and matches query sequences against identified functional regions to find the closest matches. These pipelines provide an end-to-end solution for processing NGS data, identifying functional regions, and matching them against query sequences. While tailored for antibody repertoire analysis, the core logic is adaptable to other structured sequence domains provided appropriate profile HMMs. 
+
+This repository includes the current Node.js-based implementation of the pipelines. A legacy version written in Bash/R is included in `bash_pipeline/` for reference only.
 
 ## Getting Started
 1. **Clone the Repository:**
@@ -27,8 +29,8 @@ Both pipelines require several tools and dependencies to be installed before exe
 ### Option 1: Using Conda (Preferred)
 ```bash
 # Create conda environment
-conda create -n ngs_env python==3.11.7
-conda acitvate ngs_env
+conda create -n ngs_env 
+conda activate ngs_env
 
 # Install dependencies 
 conda install -c bioconda seqkit=2.9.0 -y
@@ -66,8 +68,10 @@ The resulting `.hmm` file can be referenced in your configuration file under `mo
   - `min_quality`: Minimum quality score for FASTQ filtering.
   - `hmm_coverage`: Minimum required model coverage for hmmsearch hits.
 
-2. **Run the Script:**
+2. **Run the Script**
+You can test the counts pipeline by running:
 ```bash
+cd HMMProfiler
 node counts_pipeline.js -c test_configs/count_parameters.json
 ```
 
@@ -110,8 +114,10 @@ node counts_pipeline.js -c test_configs/count_parameters.json
   - `output_path`: Path to write CSV output of all detected matches. 
   - `max_LD`: Maximum Levenshtein distance for matching sequences. 
 
-2. **Run the Script:**
+2. **Run the Script**
+You can test the matching pipeline by running:
 ```bash
+cd HMMProfiler
 node matches_pipeline.js -c test_configs/matches_parameters.json
 ```
 
